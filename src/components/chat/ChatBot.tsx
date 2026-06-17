@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { X, Send, Trash2, Bot } from 'lucide-react'
+import { X, Send, Trash2, Bot, Copy, Check } from 'lucide-react'
 import { Spinner } from '../ui/Spinner'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -54,6 +54,89 @@ function compactarItem(it: ItemCruzado) {
     linea_costura:       it.linea_costura,
     estado:              it.estado,
   }
+}
+
+// ─── Renderer de Markdown simple ─────────────────────────────────────────────
+
+function renderInline(text: string): React.ReactNode[] {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g)
+  return parts.map((p, i) =>
+    p.startsWith('**') && p.endsWith('**')
+      ? <strong key={i} className="font-semibold">{p.slice(2, -2)}</strong>
+      : <span key={i}>{p}</span>
+  )
+}
+
+function MarkdownMsg({ text }: { text: string }) {
+  const lines = text.split('\n')
+  const nodes: React.ReactNode[] = []
+  let i = 0
+
+  while (i < lines.length) {
+    const line = lines[i]
+
+    if (/^---+$/.test(line.trim())) {
+      nodes.push(<hr key={i} className="border-line my-2" />)
+    } else if (line.startsWith('## ')) {
+      nodes.push(
+        <p key={i} className="text-sm font-bold text-ink mt-3 mb-1">
+          {renderInline(line.slice(3))}
+        </p>
+      )
+    } else if (line.startsWith('### ')) {
+      nodes.push(
+        <p key={i} className="text-sm font-semibold text-ink mt-2 mb-0.5">
+          {renderInline(line.slice(4))}
+        </p>
+      )
+    } else if (/^[-*] /.test(line)) {
+      nodes.push(
+        <div key={i} className="flex gap-1.5 text-sm leading-snug">
+          <span className="text-ink-muted mt-0.5 shrink-0">•</span>
+          <span>{renderInline(line.slice(2))}</span>
+        </div>
+      )
+    } else if (/^\d+\. /.test(line)) {
+      const num = line.match(/^(\d+)\. /)?.[1]
+      nodes.push(
+        <div key={i} className="flex gap-1.5 text-sm leading-snug">
+          <span className="text-ink-muted shrink-0 w-4 text-right">{num}.</span>
+          <span>{renderInline(line.replace(/^\d+\. /, ''))}</span>
+        </div>
+      )
+    } else if (line.trim() === '') {
+      nodes.push(<div key={i} className="h-1.5" />)
+    } else {
+      nodes.push(
+        <p key={i} className="text-sm leading-snug">
+          {renderInline(line)}
+        </p>
+      )
+    }
+    i++
+  }
+  return <div className="space-y-0.5">{nodes}</div>
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  const copy = () => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+  return (
+    <button
+      onClick={copy}
+      title="Copiar respuesta"
+      className="mt-1.5 flex items-center gap-1 text-[11px] text-ink-muted hover:text-ink transition-colors"
+    >
+      {copied
+        ? <><Check className="w-3 h-3 text-teal-600" /><span className="text-teal-600">Copiado</span></>
+        : <><Copy className="w-3 h-3" /><span>Copiar</span></>}
+    </button>
+  )
 }
 
 let nextId = 1
@@ -188,12 +271,17 @@ export function ChatBot({ items, isOpen, onClose }: Props) {
                     <Bot className="w-3.5 h-3.5 text-brand-600" />
                   </div>
                 )}
-                <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
+                <div className={`max-w-[85%] rounded-2xl px-3 py-2 ${
                   m.rol === 'user'
-                    ? 'bg-brand-600 text-white rounded-tr-sm'
+                    ? 'bg-brand-600 text-white rounded-tr-sm text-sm leading-relaxed'
                     : 'bg-surface text-ink rounded-tl-sm border border-line'
                 }`}>
-                  {m.texto}
+                  {m.rol === 'assistant'
+                    ? <>
+                        <MarkdownMsg text={m.texto} />
+                        <CopyButton text={m.texto} />
+                      </>
+                    : m.texto}
                 </div>
               </div>
             ))}
