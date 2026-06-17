@@ -5,7 +5,7 @@ export const CLAUDE_VERSION = '2023-06-01'
 
 export function getModel(cheap = false): string {
   if (cheap) {
-    return process.env.ANTHROPIC_MODEL_BARATO ?? 'claude-haiku-4-5'
+    return process.env.ANTHROPIC_MODEL_BARATO ?? 'claude-haiku-4-5-20251001'
   }
   return process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-6'
 }
