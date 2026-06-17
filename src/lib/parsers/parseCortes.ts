@@ -19,10 +19,22 @@ const ALIAS: Record<string, string> = {
   'EN PROCESO': 'en_proceso',
   'CONFECCIONADAS': 'confeccionadas',
   'CONFEC': 'confeccionadas',
-  // Bordado (post-costura, "EN PRENDA": no hay columna de "en proceso", solo el resultado final)
+  // Bordado
+  'EN BORDADO': 'en_bordado',
+  'BORDADO': 'en_bordado',
+  'EN BORDADO EXTERNO': 'en_bordado',
+  'ENVIADO BORDADO': 'en_bordado',
+  'BORDADO EXTERNO': 'en_bordado',
   'BORDADAS': 'bordadas',
-  // Estampado (post-costura, "EN PRENDA": idem, solo el resultado final)
+  'BORDADO TERMINADO': 'bordadas',
+  // Estampado
+  'EN ESTAMPADO': 'en_estampado',
+  'ESTAMPADO': 'en_estampado',
+  'EN ESTAMPADO EXTERNO': 'en_estampado',
+  'ENVIADO ESTAMPADO': 'en_estampado',
+  'ESTAMPADO EXTERNO': 'en_estampado',
   'ESTAMPADAS': 'estampadas',
+  'ESTAMPADO TERMINADO': 'estampadas',
   // Transfer (post-costura, "EN PRENDA")
   'EN TRANSFER': 'en_transfer',
   'TRANSFER TERMINADAS': 'transfer_terminadas',
@@ -95,6 +107,14 @@ export function parseCortes(
     errores.push(`Hoja "${sheetName}": no se encontró columna PO`)
     return { rows: [], leidas, validas: 0, omitidas, errores, columnasFaltantes }
   }
+
+  // Diagnóstico: mostrar todos los encabezados detectados en la fila de cabecera
+  const headerRow = data[headerRowIdx] ?? []
+  const headersDetectados = headerRow
+    .map((v) => String(v ?? '').trim())
+    .filter((v) => v !== '')
+  errores.push(`[DIAGNÓSTICO] Columnas encontradas: ${headersDetectados.join(' | ')}`)
+  errores.push(`[DIAGNÓSTICO] Columnas mapeadas: ${Object.keys(colMap).join(', ')}`)
 
   const requeridas = ['po', 'en_estanteria', 'en_proceso', 'confeccionadas']
   requeridas.forEach((r) => {
