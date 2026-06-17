@@ -3,6 +3,7 @@ import { X, Send, Trash2, Bot, Copy, Check } from 'lucide-react'
 import { Spinner } from '../ui/Spinner'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { ubicacionActual } from '../../lib/posicion'
 import type { ItemCruzado } from '../../types'
 
 interface Mensaje {
@@ -29,30 +30,32 @@ const ACCESOS_RAPIDOS = [
 
 function compactarItem(it: ItemCruzado) {
   const fmtD = (d: Date | null | undefined) => d ? format(new Date(d), 'dd/MM/yy', { locale: es }) : null
+  // Usar ubicacionActual para que el chat muestre los mismos números que el drawer
+  const pos = Object.fromEntries(ubicacionActual(it).map(u => [u.key, u.cantidad]))
   return {
-    semana:              it.semana,
-    cliente:             it.cliente,
-    estilo:              it.estilo,
-    po:                  it.po,
-    color:               it.color,
-    cant_prog:           it.cant_prog,
-    externa:             it.externa,
-    semaforo:            it.semaforo,
+    semana:               it.semana,
+    cliente:              it.cliente,
+    estilo:               it.estilo,
+    po:                   it.po,
+    color:                it.color,
+    cant_prog:            it.cant_prog,
+    externa:              it.externa,
+    semaforo:             it.semaforo,
     dias_auditoria_final: it.dias_auditoria_final,
-    auditoria_final:     fmtD(it.auditoria_final),
-    fin_entrega:         fmtD(it.fin_entrega),
-    en_proceso:          it.en_proceso,
-    confeccionadas:      it.confeccionadas,
-    en_bordado:          it.en_bordado,
-    bordadas:            it.bordadas,
-    en_estampado:        it.en_estampado,
-    estampadas:          it.estampadas,
-    en_lavanderia:       it.en_lavanderia,
-    en_acabados:         it.en_acabados,
-    piezas_acabadas:     it.piezas_acabadas,
-    total_requeridas:    it.total_requeridas,
-    linea_costura:       it.linea_costura,
-    estado:              it.estado,
+    auditoria_final:      fmtD(it.auditoria_final),
+    fin_entrega:          fmtD(it.fin_entrega),
+    en_proceso:           pos['costura']    ?? 0,
+    confeccionadas:       it.confeccionadas,
+    en_bordado:           pos['bordado']    ?? 0,
+    bordadas:             it.bordadas,
+    en_estampado:         pos['estampado']  ?? 0,
+    estampadas:           it.estampadas,
+    en_lavanderia:        pos['lavanderia'] ?? 0,
+    en_acabados:          pos['acabados']   ?? 0,
+    piezas_acabadas:      it.piezas_acabadas,
+    total_requeridas:     it.total_requeridas,
+    linea_costura:        it.linea_costura,
+    estado:               it.estado,
   }
 }
 
