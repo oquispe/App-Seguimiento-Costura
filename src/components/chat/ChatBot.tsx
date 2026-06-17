@@ -109,14 +109,20 @@ export function ChatBot({ items, isOpen, onClose }: Props) {
           items: items.map(compactarItem),
         }),
       })
-      const json = await res.json() as { respuesta?: string; error?: string }
-      const texto = json.respuesta ?? json.error ?? 'Sin respuesta del asistente.'
+      const rawText = await res.text()
+      let texto: string
+      try {
+        const json = JSON.parse(rawText) as { respuesta?: string; error?: string }
+        texto = json.respuesta ?? json.error ?? 'Sin respuesta.'
+      } catch {
+        texto = `Error HTTP ${res.status}: ${rawText.slice(0, 300)}`
+      }
       setMensajes((prev) => [...prev, { id: nextId++, rol: 'assistant', texto, ts: new Date() }])
-    } catch {
+    } catch (err) {
       setMensajes((prev) => [...prev, {
         id: nextId++,
         rol: 'assistant',
-        texto: 'Error al conectar con el asistente. Intenta de nuevo.',
+        texto: `Error: ${err instanceof Error ? err.message : String(err)}`,
         ts: new Date(),
       }])
     } finally {
