@@ -1,5 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { CLAUDE_URL, CLAUDE_VERSION, getModel } from '../_claude'
+
+const CLAUDE_URL = 'https://api.anthropic.com/v1/messages'
+const CLAUDE_VERSION = '2023-06-01'
+const MODEL = 'claude-haiku-4-5-20251001'
 
 interface MensajeHistorial {
   rol: 'user' | 'assistant'
@@ -32,7 +35,7 @@ interface ItemCompacto {
   estado: string
 }
 
-function prioridadSemaforo(s: string): number {
+function prioridad(s: string): number {
   return s === 'rojo' ? 0 : s === 'ambar' ? 1 : s === 'verde' ? 2 : 3
 }
 
@@ -49,20 +52,21 @@ function formatearItem(it: ItemCompacto): string {
   const pos = etapas.length > 0 ? etapas.join('|') : 'sin mov'
   const linea = it.linea_costura ? ` [${it.linea_costura}]` : ''
   const ext = it.externa ? ` EXT:${it.externa}` : ''
-  return `${ico} S${it.semana} ${it.cliente} | ${it.estilo} PO:${it.po} ${it.color} | ${it.cant_prog ?? '?'}pz${ext} | audit:${it.auditoria_final ?? '—'}(${dias}) | ${pos}${linea} | ${it.estado}`
+  return `${ico} S${it.semana} ${it.cliente} | ${it.estilo} PO:${it.po} ${it.color} | ${it.cant_prog ?? '?'}pz${ext} | audit:${it.auditoria_final ?? '—'}(${dias}) | ${pos}${linea}`
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' })
 
-  const { mensaje, historial = [], items = [] } = req.body ?? {}
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY no configurada' })
 
+  const { mensaje, historial = [], items = [] } = req.body ?? {}
+
   const ordenados = [...(items as ItemCompacto[])].sort(
-    (a, b) => prioridadSemaforo(a.semaforo) - prioridadSemaforo(b.semaforo)
+    (a, b) => prioridad(a.semaforo) - prioridad(b.semaforo)
   )
-  const resumen = ordenados.slice(0, 220).map(formatearItem).join('\n')
+  const resumen = ordenados.slice(0, 200).map(formatearItem).join('\n')
 
   const system = `Eres el asistente de producción y auditorías de CMT del Sur.
 Conoces el estado en tiempo real de todas las órdenes de confección y respondes preguntas del equipo.
@@ -81,7 +85,7 @@ CÓMO RESPONDER:
 
   const messages = [
     ...(historial as MensajeHistorial[]).map((h) => ({ role: h.rol, content: h.texto })),
-    { role: 'user' as const, content: mensaje },
+    { role: 'user' as const, content: String(mensaje ?? '') },
   ]
 
   try {
@@ -92,20 +96,15 @@ CÓMO RESPONDER:
         'anthropic-version': CLAUDE_VERSION,
         'content-type': 'application/json',
       },
-      body: JSON.stringify({
-        model: getModel(true),
-        max_tokens: 1024,
-        system,
-        messages,
-      }),
+      body: JSON.stringify({ model: MODEL, max_tokens: 1024, system, messages }),
     })
 
+    const data = await response.json() as { content?: { text?: string }[]; error?: { message?: string } }
+
     if (!response.ok) {
-      const err = await response.text()
-      return res.status(500).json({ error: `Claude API error: ${err}` })
+      return res.status(500).json({ error: data?.error?.message ?? `Claude error ${response.status}` })
     }
 
-    const data = await response.json() as { content?: { text?: string }[] }
     return res.status(200).json({ respuesta: data.content?.[0]?.text ?? '' })
   } catch (err) {
     return res.status(500).json({ error: err instanceof Error ? err.message : 'Error interno' })
