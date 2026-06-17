@@ -1,0 +1,393 @@
+<!--
+  REFERENCIA DE DISEÑO — Tablero de Seguimiento de Auditorías Finales (CMT del Sur)
+  Propósito: plano visual exacto para construir la app en React + Tailwind.
+  Identidad "Industrial Precision": azul primario + neutros, denso pero legible, plano (sin sombras pesadas).
+
+  Tokens (configurados en tailwind.config abajo):
+    brand   #1d4ed8 (acento de marca / acciones primarias)
+    ink/muted/faint   texto principal / secundario / hint
+    line/surface      bordes / fondo de página
+  Semánticos (paleta Tailwind por defecto):
+    semáforo  red-* (vencida/≤1d) · amber-* (2-3d) · emerald-* (con holgura)
+    avance corte  teal-500 confeccionadas · amber-500 en proceso · slate-300 en estantería
+    estado  emerald aprobada · blue programada · amber en proceso · red rechazada · slate pendiente · violet reprogramada
+
+  Pantallas incluidas: (1) Dashboard  (2) Cumplimiento por persona  (3) Drawer de detalle (clic en una fila).
+-->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tablero de Auditorías Finales — referencia de diseño</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: { extend: {
+    colors: {
+      brand: { DEFAULT: '#1d4ed8', dark: '#1e3a8a', soft: '#eff4ff' },
+      ink: '#0f172a', muted: '#475569', faint: '#94a3b8',
+      line: '#e6e9ef', surface: '#f6f7f9'
+    },
+    fontFamily: { sans: ['Inter','system-ui','sans-serif'], mono: ['"JetBrains Mono"','ui-monospace','monospace'] }
+  }}
+};
+</script>
+<style>
+  html { font-family: Inter, system-ui, sans-serif; }
+  body { background: #f6f7f9; color: #0f172a; }
+  .seg { height: 7px; border-radius: 9999px; overflow: hidden; display: flex; background: #eef1f5; }
+  table { border-collapse: collapse; }
+  ::-webkit-scrollbar { height: 8px; width: 8px; }
+  ::-webkit-scrollbar-thumb { background: #cdd3dd; border-radius: 9999px; }
+</style>
+</head>
+<body class="text-[14px]">
+
+<!-- ===== Top bar ===== -->
+<header class="sticky top-0 z-20 bg-white border-b border-line">
+  <div class="max-w-[1200px] mx-auto px-5 h-14 flex items-center gap-4">
+    <div class="flex items-center gap-2 shrink-0">
+      <div class="w-8 h-8 rounded-lg bg-brand text-white grid place-items-center font-semibold">CM</div>
+      <div class="font-semibold text-ink leading-tight">textile audit tracker<div class="text-[11px] font-normal text-faint">CMT del Sur</div></div>
+    </div>
+    <nav class="flex items-center gap-1 ml-2">
+      <button onclick="showView('dash')" id="tab-dash" class="px-3 py-1.5 rounded-md text-[13px] font-medium text-brand bg-brand-soft">dashboard</button>
+      <button onclick="showView('cump')" id="tab-cump" class="px-3 py-1.5 rounded-md text-[13px] font-medium text-muted hover:bg-surface">cumplimiento por persona</button>
+    </nav>
+    <div class="ml-auto flex items-center gap-2">
+      <div class="hidden sm:flex items-center gap-2 px-2.5 h-9 rounded-md border border-line text-muted">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input placeholder="buscar PO, estilo, cliente" class="bg-transparent outline-none text-[13px] w-44 placeholder:text-faint">
+      </div>
+      <button class="h-9 px-3 rounded-md bg-brand text-white text-[13px] font-medium">semana actual</button>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-[1200px] mx-auto px-5 py-6">
+
+  <!-- ============ DASHBOARD VIEW ============ -->
+  <section id="view-dash">
+    <div class="flex items-end justify-between mb-4 flex-wrap gap-2">
+      <div>
+        <h1 class="text-xl font-semibold leading-tight">seguimiento de auditorías finales</h1>
+        <p class="text-[13px] text-muted">semana 23 · cruza auditorías, fechas del PGO y status de corte por PO</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button class="h-9 px-3 rounded-md border border-line bg-white text-[13px] font-medium text-brand flex items-center gap-1.5">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18" opacity=".0"/><path d="M5 3v4M3 5h4M6 17v4M4 19h4M13 3l2.5 6.5L22 12l-6.5 2.5L13 21l-2.5-6.5L4 12l6.5-2.5z"/></svg>
+          priorizar con IA
+        </button>
+        <button class="h-9 px-3 rounded-md border border-line bg-white text-[13px] font-medium text-muted flex items-center gap-1.5">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg>
+          exportar
+        </button>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
+      <div class="rounded-xl bg-white border border-line p-4">
+        <div class="text-[13px] text-muted">total POs</div>
+        <div class="text-2xl font-semibold mt-0.5">124</div>
+        <div class="text-[11px] text-faint mt-0.5">8 nuevas esta semana</div>
+      </div>
+      <div class="rounded-xl bg-white border border-line p-4">
+        <div class="text-[13px] text-muted">auditadas</div>
+        <div class="text-2xl font-semibold mt-0.5">86</div>
+        <div class="text-[11px] text-emerald-600 mt-0.5">▲ +4 vs sem 22</div>
+      </div>
+      <div class="rounded-xl bg-white border border-line p-4">
+        <div class="text-[13px] text-muted">pendientes</div>
+        <div class="text-2xl font-semibold mt-0.5">32</div>
+        <div class="text-[11px] text-faint mt-0.5">26% del total</div>
+      </div>
+      <div class="rounded-xl bg-red-50 border border-red-100 p-4">
+        <div class="text-[13px] text-red-700">vencidas</div>
+        <div class="text-2xl font-semibold mt-0.5 text-red-700">6</div>
+        <div class="text-[11px] text-red-600 mt-0.5">▲ +2 requieren acción</div>
+      </div>
+      <div class="rounded-xl bg-white border border-line p-4">
+        <div class="text-[13px] text-muted">cumplimiento</div>
+        <div class="text-2xl font-semibold mt-0.5">69%</div>
+        <div class="text-[11px] text-emerald-600 mt-0.5">▲ +3% vs sem 22</div>
+      </div>
+    </div>
+
+    <!-- Distribución de estados -->
+    <div class="rounded-xl bg-white border border-line p-4 mb-4">
+      <div class="text-[13px] text-muted mb-2">distribución de estados</div>
+      <div class="flex h-2.5 rounded-full overflow-hidden">
+        <div class="bg-emerald-500" style="width:50%"></div>
+        <div class="bg-amber-500" style="width:18%"></div>
+        <div class="bg-blue-500" style="width:14%"></div>
+        <div class="bg-slate-400" style="width:10%"></div>
+        <div class="bg-red-500" style="width:5%"></div>
+        <div class="bg-violet-500" style="width:3%"></div>
+      </div>
+      <div class="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-[11px] text-muted">
+        <span><i class="dot bg-emerald-500"></i>aprobadas 62</span>
+        <span><i class="dot bg-amber-500"></i>en proceso 22</span>
+        <span><i class="dot bg-blue-500"></i>programadas 18</span>
+        <span><i class="dot bg-slate-400"></i>pendientes 12</span>
+        <span><i class="dot bg-red-500"></i>rechazadas 6</span>
+        <span><i class="dot bg-violet-500"></i>reprogramadas 4</span>
+      </div>
+    </div>
+
+    <!-- Filtros visibles -->
+    <div class="flex flex-wrap gap-2 mb-3">
+      <span class="px-3 py-1.5 rounded-md text-[12px] font-medium bg-brand-soft text-brand">semana actual</span>
+      <span class="px-3 py-1.5 rounded-md text-[12px] border border-line text-muted">todos los clientes</span>
+      <span class="px-3 py-1.5 rounded-md text-[12px] border border-line text-muted">todos los estados</span>
+      <span class="px-3 py-1.5 rounded-md text-[12px] border border-red-200 text-red-600 flex items-center gap-1"><i class="dot bg-red-500"></i>solo vencidas</span>
+    </div>
+
+    <!-- Tabla principal -->
+    <div class="rounded-xl bg-white border border-line overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-[13px] min-w-[860px]">
+          <thead>
+            <tr class="text-left text-muted border-b border-line">
+              <th class="font-medium px-4 py-2.5">cliente / estilo</th>
+              <th class="font-medium px-3 py-2.5">PO</th>
+              <th class="font-medium px-3 py-2.5">color</th>
+              <th class="font-medium px-3 py-2.5 text-right">cant.</th>
+              <th class="font-medium px-3 py-2.5 w-[180px]">avance de corte</th>
+              <th class="font-medium px-3 py-2.5">auditoría final</th>
+              <th class="font-medium px-4 py-2.5">estado</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Leyenda avance corte -->
+    <div class="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-[11px] text-muted">
+      <span><i class="dot bg-teal-500"></i>confeccionadas</span>
+      <span><i class="dot bg-amber-500"></i>en proceso</span>
+      <span><i class="dot bg-slate-300"></i>en estantería</span>
+      <span class="ml-auto text-faint">clic en una fila para ver el detalle y registrar el seguimiento</span>
+    </div>
+  </section>
+
+  <!-- ============ CUMPLIMIENTO POR PERSONA VIEW ============ -->
+  <section id="view-cump" class="hidden">
+    <div class="mb-4">
+      <h1 class="text-xl font-semibold leading-tight">cumplimiento por responsable</h1>
+      <p class="text-[13px] text-muted">desempeño de auditorías asignadas vs. completadas a tiempo</p>
+    </div>
+    <div class="rounded-xl bg-white border border-line overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-[13px] min-w-[680px]">
+          <thead>
+            <tr class="text-left text-muted border-b border-line">
+              <th class="font-medium px-4 py-2.5">responsable</th>
+              <th class="font-medium px-3 py-2.5 w-[280px]">% cumplimiento</th>
+              <th class="font-medium px-3 py-2.5 text-right">asignadas</th>
+              <th class="font-medium px-3 py-2.5 text-right">a tiempo</th>
+              <th class="font-medium px-4 py-2.5 text-right">vencidas</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-cump"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ===== Drawer de detalle ===== -->
+<div id="scrim" onclick="closeDrawer()" class="fixed inset-0 bg-black/30 opacity-0 pointer-events-none transition-opacity z-30"></div>
+<aside id="drawer" class="fixed top-0 right-0 h-full w-full sm:w-[420px] bg-white border-l border-line translate-x-full transition-transform z-40 flex flex-col">
+  <div class="px-5 py-4 border-b border-line">
+    <div class="flex items-start justify-between">
+      <div class="text-[11px] uppercase tracking-wide text-faint">seguimiento de auditoría</div>
+      <button onclick="closeDrawer()" class="text-faint hover:text-ink">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <h2 id="d-title" class="text-[15px] font-semibold mt-1 leading-snug">—</h2>
+    <p id="d-sub" class="text-[12px] text-muted"></p>
+  </div>
+
+  <div class="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+    <!-- Datos PGO (solo lectura) -->
+    <div class="rounded-lg bg-surface border border-line p-3">
+      <div class="text-[12px] font-medium text-muted mb-2">datos del PGO</div>
+      <div class="flex items-center justify-between text-[13px] py-1">
+        <span class="text-muted">fin de entrega</span>
+        <span class="flex items-center gap-1.5"><i class="dot bg-emerald-500"></i>25/06</span>
+      </div>
+      <div class="flex items-center justify-between text-[13px] py-1">
+        <span class="text-muted">auditoría final</span>
+        <span class="flex items-center gap-1.5"><i class="dot bg-amber-500"></i>20/06 · 3 d</span>
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-[12px] font-medium text-muted mb-1">estado</label>
+      <select class="w-full h-9 px-2.5 rounded-md border border-line bg-white text-[13px]">
+        <option>en proceso</option><option>pendiente</option><option>programada</option>
+        <option>aprobada</option><option>rechazada</option><option>reprogramada</option>
+      </select>
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-[12px] font-medium text-muted mb-1">fecha solicitada</label>
+        <input type="date" value="2025-06-10" class="w-full h-9 px-2.5 rounded-md border border-line text-[13px]">
+      </div>
+      <div>
+        <label class="block text-[12px] font-medium text-muted mb-1">fecha auditoría real</label>
+        <input type="date" class="w-full h-9 px-2.5 rounded-md border border-line text-[13px] text-faint">
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-[12px] font-medium text-muted mb-1">solicitado por</label>
+      <input value="producción central" class="w-full h-9 px-2.5 rounded-md border border-line text-[13px]">
+    </div>
+    <div>
+      <label class="block text-[12px] font-medium text-muted mb-1">responsable / auditor</label>
+      <input value="carlos m." class="w-full h-9 px-2.5 rounded-md border border-line text-[13px]">
+    </div>
+    <div>
+      <label class="block text-[12px] font-medium text-muted mb-1">resultado / hallazgos</label>
+      <textarea rows="3" class="w-full px-2.5 py-2 rounded-md border border-line text-[13px]">revisión en curso. tela de forro pendiente de validación de color.</textarea>
+    </div>
+
+    <!-- Bitácora -->
+    <div>
+      <div class="text-[12px] font-medium text-muted mb-2">bitácora de auditoría</div>
+      <div class="space-y-2">
+        <div class="border-l-2 border-line pl-3">
+          <div class="text-[13px]">inicio de confección</div>
+          <div class="text-[11px] text-faint">juan p. · 14/06</div>
+        </div>
+        <div class="border-l-2 border-red-300 pl-3">
+          <div class="text-[13px]">tela recibida con retraso</div>
+          <div class="text-[11px] text-faint">maría g. · 17/06</div>
+        </div>
+      </div>
+      <input placeholder="agregar comentario…" class="mt-2 w-full h-9 px-2.5 rounded-md border border-line text-[13px]">
+    </div>
+  </div>
+
+  <div class="border-t border-line p-4 space-y-2">
+    <button class="w-full h-9 rounded-md border border-line text-[13px] font-medium text-brand flex items-center justify-center gap-1.5">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 3l2.5 6.5L22 12l-6.5 2.5L13 21l-2.5-6.5L4 12l6.5-2.5z"/></svg>
+      sugerir acción correctiva
+    </button>
+    <button class="w-full h-10 rounded-md bg-brand text-white text-[13px] font-medium">guardar</button>
+  </div>
+</aside>
+
+<style>
+  .dot { display:inline-block; width:8px; height:8px; border-radius:9999px; margin-right:5px; vertical-align:middle; }
+</style>
+
+<script>
+  function showView(v){
+    document.getElementById('view-dash').classList.toggle('hidden', v!=='dash');
+    document.getElementById('view-cump').classList.toggle('hidden', v!=='cump');
+    var on='text-brand bg-brand-soft', off='text-muted hover:bg-surface';
+    document.getElementById('tab-dash').className='px-3 py-1.5 rounded-md text-[13px] font-medium '+(v==='dash'?on:off);
+    document.getElementById('tab-cump').className='px-3 py-1.5 rounded-md text-[13px] font-medium '+(v==='cump'?on:off);
+  }
+  function openDrawer(title, sub){
+    document.getElementById('d-title').textContent=title;
+    document.getElementById('d-sub').textContent=sub;
+    document.getElementById('drawer').classList.remove('translate-x-full');
+    var s=document.getElementById('scrim'); s.classList.remove('opacity-0','pointer-events-none');
+  }
+  function closeDrawer(){
+    document.getElementById('drawer').classList.add('translate-x-full');
+    var s=document.getElementById('scrim'); s.classList.add('opacity-0','pointer-events-none');
+  }
+
+  var ESTADOS={
+    aprobada:{t:'aprobada',c:'bg-emerald-50 text-emerald-700'},
+    programada:{t:'programada',c:'bg-blue-50 text-blue-700'},
+    proceso:{t:'en proceso',c:'bg-amber-50 text-amber-700'},
+    rechazada:{t:'rechazada',c:'bg-red-50 text-red-700'},
+    pendiente:{t:'pendiente',c:'bg-slate-100 text-slate-600'},
+    reprogramada:{t:'reprogramada',c:'bg-violet-50 text-violet-700'}
+  };
+  function semaforo(r){
+    if(r.v) return '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[12px] bg-red-50 text-red-700"><i class="dot bg-red-500" style="margin:0"></i>vencida</span>';
+    var cls=r.dias<=1?'bg-red-50 text-red-700':(r.dias<=3?'bg-amber-50 text-amber-700':'bg-emerald-50 text-emerald-700');
+    var dotc=r.dias<=1?'bg-red-500':(r.dias<=3?'bg-amber-500':'bg-emerald-500');
+    return '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[12px] '+cls+'"><i class="dot '+dotc+'" style="margin:0"></i>'+r.dias+' d</span>';
+  }
+  function seg(r){
+    return '<div class="seg"><div class="bg-teal-500" style="width:'+r.conf+'%"></div><div class="bg-amber-500" style="width:'+r.proc+'%"></div><div class="bg-slate-300" style="width:'+r.esta+'%"></div></div>'+
+           '<div class="text-[11px] text-faint mt-1">'+r.conf+'% confeccionadas</div>';
+  }
+
+  var GROUPS=[
+    {cli:'Zara Home', sub:2050, rows:[
+      {est:'funda nórdica lino',po:'PO-819426',color:'blanco tiza',cant:1200,conf:100,proc:0,esta:0,dias:8,estado:'aprobada'},
+      {est:'sábana bajera alg',po:'PO-819421',color:'gris perla',cant:850,conf:80,proc:15,esta:5,dias:6,estado:'programada'}
+    ]},
+    {cli:"Levi's", sub:4400, rows:[
+      {est:'501 original fit',po:'PO-540267',color:'dark wash',cant:3500,conf:60,proc:30,esta:10,v:true,estado:'rechazada'},
+      {est:'trucker jacket',po:'PO-540265',color:'light stonewash',cant:900,conf:42,proc:40,esta:18,dias:2,estado:'programada'}
+    ]},
+    {cli:'Travis Mathew', sub:891, rows:[
+      {est:'A48300 polo',po:'4602524981',color:'roasted cashew',cant:94,conf:88,proc:12,esta:0,dias:5,estado:'proceso'},
+      {est:'A47021 quarter zip',po:'4602567251',color:'quiet harbor',cant:797,conf:100,proc:0,esta:0,dias:9,estado:'aprobada'}
+    ]}
+  ];
+  var tb=document.getElementById('tbody');
+  GROUPS.forEach(function(g){
+    var gr=document.createElement('tr');
+    gr.className='bg-surface text-muted';
+    gr.innerHTML='<td colspan="4" class="px-4 py-1.5 text-[12px] font-medium">'+g.cli+'</td><td colspan="3" class="px-4 py-1.5 text-[12px] text-right">subtotal '+g.sub.toLocaleString('es-PE')+' und</td>';
+    tb.appendChild(gr);
+    g.rows.forEach(function(r){
+      var e=ESTADOS[r.estado];
+      var tr=document.createElement('tr');
+      tr.className='border-b border-line cursor-pointer '+(r.v?'bg-red-50/60 hover:bg-red-50':'hover:bg-surface');
+      tr.onclick=function(){openDrawer(g.cli+' / '+r.est, r.po+' · '+r.color);};
+      tr.innerHTML=
+        '<td class="px-4 py-2.5 font-medium whitespace-nowrap">'+r.est+'</td>'+
+        '<td class="px-3 py-2.5 text-muted font-mono text-[12px]">'+r.po+'</td>'+
+        '<td class="px-3 py-2.5 text-muted whitespace-nowrap">'+r.color+'</td>'+
+        '<td class="px-3 py-2.5 text-right">'+r.cant.toLocaleString('es-PE')+'</td>'+
+        '<td class="px-3 py-2.5">'+seg(r)+'</td>'+
+        '<td class="px-3 py-2.5">'+semaforo(r)+'</td>'+
+        '<td class="px-4 py-2.5"><span class="inline-block px-2 py-0.5 rounded-md text-[12px] '+e.c+'">'+e.t+'</span></td>';
+      tb.appendChild(tr);
+    });
+  });
+
+  var PEOPLE=[
+    {n:'carlos rodríguez',p:85,a:20,t:17,v:3},
+    {n:'maría gómez',p:100,a:15,t:15,v:0},
+    {n:'jorge silva',p:40,a:10,t:4,v:6},
+    {n:'ana lópez',p:92,a:25,t:23,v:2},
+    {n:'luis fernández',p:75,a:16,t:12,v:4},
+    {n:'elena ruiz',p:60,a:30,t:18,v:12}
+  ];
+  var tc=document.getElementById('tbody-cump');
+  PEOPLE.forEach(function(r){
+    var bar=r.p>=85?'bg-emerald-500':(r.p>=60?'bg-amber-500':'bg-red-500');
+    var tr=document.createElement('tr');
+    tr.className='border-b border-line hover:bg-surface';
+    tr.innerHTML=
+      '<td class="px-4 py-3 font-medium">'+r.n+'</td>'+
+      '<td class="px-3 py-3"><div class="flex items-center gap-2"><div class="flex-1 h-2 rounded-full bg-surface overflow-hidden"><div class="'+bar+' h-full" style="width:'+r.p+'%"></div></div><span class="text-[12px] text-muted w-9 text-right">'+r.p+'%</span></div></td>'+
+      '<td class="px-3 py-3 text-right">'+r.a+'</td>'+
+      '<td class="px-3 py-3 text-right text-emerald-600">'+r.t+'</td>'+
+      '<td class="px-4 py-3 text-right '+(r.v>0?'text-red-600 font-medium':'text-faint')+'">'+r.v+'</td>';
+    tc.appendChild(tr);
+  });
+</script>
+</body>
+</html>
