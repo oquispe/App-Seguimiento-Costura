@@ -35,12 +35,15 @@ function tieneCompromisoVencido(
   const hoy = new Date()
   hoy.setHours(0, 0, 0, 0)
   const piezasPorEtapa: Record<string, number> = {
-    costura:    item.en_estanteria + item.en_proceso,
-    bordado:    item.en_bordado,
-    estampado:  item.en_estampado,
-    transfer:   item.en_transfer,
-    lavanderia: item.en_lavanderia,
-    acabados:   item.en_acabados,
+    corte:          item.en_corte,
+    bordado:        item.en_bordado,
+    costura:        item.en_costura,
+    estampado:      item.en_estampado,
+    estampado_ext:  item.en_estampado_ext,
+    lavanderia:     item.en_lavanderia,
+    costura_lineas: item.en_costura_lineas,
+    acabado:        item.en_acabado,
+    apt:            item.apt,
   }
   return Object.entries(compromisos).some(([etapa, comp]) => {
     if (!comp.fecha_compromiso) return false

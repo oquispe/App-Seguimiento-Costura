@@ -30,13 +30,13 @@ const ACCESOS_RAPIDOS = [
 
 function compactarItem(it: ItemCruzado) {
   const fmtD = (d: Date | null | undefined) => d ? format(new Date(d), 'dd/MM/yy', { locale: es }) : null
-  // Usar ubicacionActual para que el chat muestre los mismos números que el drawer
   const pos = Object.fromEntries(ubicacionActual(it).map(u => [u.key, u.cantidad]))
   return {
     semana:               it.semana,
     cliente:              it.cliente,
     estilo:               it.estilo,
     po:                   it.po,
+    op:                   it.op,
     color:                it.color,
     cant_prog:            it.cant_prog,
     externa:              it.externa,
@@ -44,17 +44,16 @@ function compactarItem(it: ItemCruzado) {
     dias_auditoria_final: it.dias_auditoria_final,
     auditoria_final:      fmtD(it.auditoria_final),
     fin_entrega:          fmtD(it.fin_entrega),
-    en_proceso:           pos['costura']    ?? 0,
-    confeccionadas:       it.confeccionadas,
-    en_bordado:           pos['bordado']    ?? 0,
-    bordadas:             it.bordadas,
-    en_estampado:         pos['estampado']  ?? 0,
-    estampadas:           it.estampadas,
-    en_lavanderia:        pos['lavanderia'] ?? 0,
-    en_acabados:          pos['acabados']   ?? 0,
-    piezas_acabadas:      it.piezas_acabadas,
+    en_corte:             pos['corte']          ?? 0,
+    en_bordado:           pos['bordado']        ?? 0,
+    en_costura:           pos['costura']        ?? 0,
+    en_estampado:         pos['estampado']      ?? 0,
+    en_estampado_ext:     pos['estampado_ext']  ?? 0,
+    en_lavanderia:        pos['lavanderia']     ?? 0,
+    en_costura_lineas:    pos['costura_lineas'] ?? 0,
+    en_acabado:           pos['acabado']        ?? 0,
+    apt:                  it.apt,
     total_requeridas:     it.total_requeridas,
-    linea_costura:        it.linea_costura,
     estado:               it.estado,
   }
 }

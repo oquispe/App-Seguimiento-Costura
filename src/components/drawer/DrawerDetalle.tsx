@@ -59,8 +59,8 @@ function RutaProgreso({ item }: { item: ItemCruzado }) {
         <div className="pt-1 border-t border-line flex justify-between text-xs text-ink-muted">
           <span>Total requerido: <strong className="text-ink">{total}</strong> pzas</span>
           <span>
-            Ingresos Acabados: <strong className="text-ink">{item.ingresos_acabados_1ra}</strong> 1ra
-            {' · '}<strong className="text-ink">{item.ingresos_acabados_2da}</strong> 2da
+            Acabado: <strong className="text-ink">{item.en_acabado}</strong>
+            {' · '}APT: <strong className="text-ink">{item.apt}</strong>
           </span>
         </div>
       )}
@@ -229,9 +229,9 @@ export function DrawerDetalle({ item, onClose, onUpdated }: Props) {
                 {item.ruta}
               </p>
             )}
-            {item.linea_costura && (
+            {item.op && (
               <p className="text-xs text-ink-muted mb-3">
-                Línea costura: <span className="text-ink font-medium">{item.linea_costura}</span>
+                OP: <span className="text-ink font-medium font-mono">{item.op}</span>
               </p>
             )}
             <RutaProgreso item={item} />

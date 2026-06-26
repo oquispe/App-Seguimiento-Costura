@@ -2,66 +2,39 @@ import * as XLSX from 'xlsx'
 import { normalize, normalizePO } from './normalize'
 import type { CortesRow, ParseResult } from '../../types'
 
-const ALIAS: Record<string, string> = {
-  // Identificadores
-  'PO': 'po',
-  'CLIENTE': 'cliente',
-  'COLOR': 'color',
-  'COLOR PRENDA': 'color',
-  'COLOR CLIENTE': 'color',
-  // Ruta
-  'RUTA PRENDA': 'ruta',
-  'RUTA': 'ruta',
-  // Costura (EN ESTANTERIA = piezas habilitadas esperando costura)
-  'EN ESTANTERIA': 'en_estanteria',
-  'EN ESTANTERÍA': 'en_estanteria',
-  'ESTANTERIA': 'en_estanteria',
-  'EN PROCESO': 'en_proceso',
-  'CONFECCIONADAS': 'confeccionadas',
-  'CONFEC': 'confeccionadas',
-  // Bordado
-  'PRENDAS EN BORDADO': 'en_bordado',
-  'EN BORDADO': 'en_bordado',
-  'BORDADO': 'en_bordado',
-  'EN BORDADO EXTERNO': 'en_bordado',
-  'BORDADO EXTERNO': 'en_bordado',
-  'BORDADAS': 'bordadas',
-  // Estampado
-  'PRENDAS EN ESTAMPADO': 'en_estampado',
-  'EN ESTAMPADO': 'en_estampado',
-  'ESTAMPADO': 'en_estampado',
-  'EN ESTAMPADO EXTERNO': 'en_estampado',
-  'ESTAMPADO EXTERNO': 'en_estampado',
-  'ESTAMPADAS': 'estampadas',
-  // Corte (antes de costura → estantería)
-  'EN CORTE': 'en_estanteria',
-  'CORTE': 'en_estanteria',
-  // Transfer (post-costura, "EN PRENDA")
-  'EN TRANSFER': 'en_transfer',
-  'TRANSFER TERMINADAS': 'transfer_terminadas',
-  // Lavandería
-  'EN LAVANDERIA': 'en_lavanderia',
-  'EN LAVANDERÍA': 'en_lavanderia',
-  'LAVADAS': 'lavadas',
-  // Acabados: ingreso real a la etapa final, separado por calidad
-  'INGRESOS ACABADOS 1RA': 'ingresos_acabados_1ra',
-  'INGRESOS ACABADOS 2DA': 'ingresos_acabados_2da',
-  // Total requerido (es el mismo para todas las partidas del OP; usamos MAX)
-  'PRENDAS REQUERIDAS OP': 'total_requeridas',
-  'PRENDAS REQUERIDAS': 'total_requeridas',
-  'CANT TOTAL': 'total_requeridas',
-  // Línea de costura: texto (nombre del taller/línea), NO es un número
-  'LINEA COSTURA': 'linea_costura',
-  'LÍNEA COSTURA': 'linea_costura',
-  'LINEA': 'linea_costura',
-  'L. COSTURA': 'linea_costura',
-}
-
 function toNum(v: unknown): number {
   if (v === null || v === undefined || v === '') return 0
   const n = Number(v)
   return isNaN(n) ? 0 : n
 }
+
+// Columnas de identificación en Hoja1
+const ID_ALIAS: Record<string, string> = {
+  'PO':             'po',
+  'OP':             'op',
+  'CLIENTE':        'cliente',
+  'COLOR CLIENTE':  'color',
+  'RUTA_GENERAL':   'ruta',
+  'RUTA GENERAL':   'ruta',
+  'REQUERIDA':      'total_requeridas',
+}
+
+// Mapeo Hoja2: field → [col1 normalizada, col2 normalizada]
+// col1 vacío = solo col2 contribuye
+const AREA_MAP: { field: keyof Pick<CortesRow,
+  'en_corte'|'en_bordado'|'en_costura'|'en_estampado'|'en_estampado_ext'|
+  'en_lavanderia'|'en_costura_lineas'|'en_acabado'|'apt'>
+  col1: string; col2: string }[] = [
+  { field: 'en_corte',          col1: 'POR CORTAR',            col2: 'EN CORTE' },
+  { field: 'en_bordado',        col1: 'BORDADO PZA',           col2: 'BORDADO PDA' },
+  { field: 'en_costura',        col1: 'ESTANTERIA',            col2: 'COSTURA PROCESO' },
+  { field: 'en_estampado',      col1: 'ESTAMPADO PZA CHINCHA', col2: 'ESTAMPADO PDA CHINCHA' },
+  { field: 'en_estampado_ext',  col1: 'ESTAMPADO PZA EXT',     col2: 'ESTAMPADO PDA EXT' },
+  { field: 'en_lavanderia',     col1: '',                      col2: 'LAVANDERIA_PDA' },
+  { field: 'en_costura_lineas', col1: '',                      col2: 'COSTURA LINEAS' },
+  { field: 'en_acabado',        col1: '',                      col2: 'ACABADO' },
+  { field: 'apt',               col1: '',                      col2: 'APT' },
+]
 
 export function parseCortes(
   buffer: ArrayBuffer,
@@ -69,10 +42,8 @@ export function parseCortes(
 ): ParseResult<CortesRow> {
   const wb = XLSX.read(buffer, { type: 'array', cellDates: false })
 
-  const sheetName =
-    wb.SheetNames.find((n) => normalize(n).includes('STATUSCORTE') || normalize(n).includes('STATUS CORTE')) ??
-    wb.SheetNames[0]
-
+  // Usar Hoja1 (primera hoja)
+  const sheetName = wb.SheetNames[0]
   const ws = wb.Sheets[sheetName]
   const data: unknown[][] = XLSX.utils.sheet_to_json(ws, {
     header: 1,
@@ -85,124 +56,95 @@ export function parseCortes(
   const errores: string[] = []
   const columnasFaltantes: string[] = []
 
-  // Buscar cabecera en las primeras 10 filas
-  let headerRowIdx = -1
-  let colMap: Record<string, number> = {}
+  if (data.length === 0) {
+    errores.push('Hoja1 está vacía')
+    return { rows: [], leidas, validas: 0, omitidas, errores, columnasFaltantes }
+  }
 
-  for (let r = 0; r < Math.min(10, data.length); r++) {
-    const row = data[r] ?? []
-    const tmp: Record<string, number> = {}
-    for (let c = 0; c < row.length; c++) {
-      const norm = normalize(String(row[c] ?? ''))
-      const mapped = ALIAS[norm]
-      if (mapped && !(mapped in tmp)) tmp[mapped] = c
+  // Leer cabecera (fila 0)
+  const headerRow = data[0] ?? []
+  const colIdx: Record<string, number> = {}
+
+  for (let c = 0; c < headerRow.length; c++) {
+    const norm = normalize(String(headerRow[c] ?? ''))
+    // Mapear identificadores
+    if (ID_ALIAS[norm] && !(ID_ALIAS[norm] in colIdx)) {
+      colIdx[ID_ALIAS[norm]] = c
     }
-    if ('po' in tmp) {
-      headerRowIdx = r
-      colMap = tmp
-      break
+    // Mapear columnas de área por nombre normalizado
+    for (const area of AREA_MAP) {
+      if (area.col1 && norm === area.col1 && !(`${area.field}_c1` in colIdx)) {
+        colIdx[`${area.field}_c1`] = c
+      }
+      if (area.col2 && norm === area.col2 && !(`${area.field}_c2` in colIdx)) {
+        colIdx[`${area.field}_c2`] = c
+      }
     }
   }
 
-  if (headerRowIdx === -1) {
+  if (!('po' in colIdx)) {
     errores.push(`Hoja "${sheetName}": no se encontró columna PO`)
     return { rows: [], leidas, validas: 0, omitidas, errores, columnasFaltantes }
   }
 
+  // Verificar columnas faltantes
+  for (const area of AREA_MAP) {
+    if (area.col1 && !(`${area.field}_c1` in colIdx)) columnasFaltantes.push(`${area.field}:col1`)
+    if (area.col2 && !(`${area.field}_c2` in colIdx)) columnasFaltantes.push(`${area.field}:col2`)
+  }
 
-  const requeridas = ['po', 'en_estanteria', 'en_proceso', 'confeccionadas']
-  requeridas.forEach((r) => {
-    if (!(r in colMap)) columnasFaltantes.push(`Cortes:${r}`)
-  })
-
-  // Acumulador por PO+COLOR (agregamos todas las partidas del mismo PO y color)
+  // Acumular por PO+COLOR
   const acum = new Map<string, CortesRow>()
 
-  for (let r = headerRowIdx + 1; r < data.length; r++) {
+  for (let r = 1; r < data.length; r++) {
     const row = data[r] ?? []
-    const poRaw = row[colMap['po']]
+    const poRaw = row[colIdx['po']]
     const po = normalizePO(String(poRaw ?? ''))
     if (!po) { omitidas++; continue }
 
     leidas++
-    const colorRaw = colMap['color'] !== undefined ? String(row[colMap['color']] ?? '').trim() : ''
-    const key = `${po}|${normalize(colorRaw)}`
 
+    const op      = String(row[colIdx['op']] ?? '').trim()
+    const cliente = 'cliente' in colIdx ? String(row[colIdx['cliente']] ?? '').trim() : ''
+    const color   = 'color' in colIdx   ? String(row[colIdx['color']] ?? '').trim() : ''
+    const ruta    = 'ruta' in colIdx    ? String(row[colIdx['ruta']] ?? '').trim() : ''
+    const totReq  = 'total_requeridas' in colIdx ? toNum(row[colIdx['total_requeridas']]) : 0
+
+    const key = `${po}|${normalize(color)}`
     const existing = acum.get(key)
 
-    const cliente = colMap['cliente'] !== undefined ? String(row[colMap['cliente']] ?? '').trim() : ''
-    const rutaStr = colMap['ruta'] !== undefined ? String(row[colMap['ruta']] ?? '').trim() : ''
-    const est     = toNum(colMap['en_estanteria'] !== undefined ? row[colMap['en_estanteria']] : 0)
-    const proc    = toNum(colMap['en_proceso'] !== undefined ? row[colMap['en_proceso']] : 0)
-    const conf    = toNum(colMap['confeccionadas'] !== undefined ? row[colMap['confeccionadas']] : 0)
-    const enBord  = toNum(colMap['en_bordado'] !== undefined ? row[colMap['en_bordado']] : 0)
-    const bord    = toNum(colMap['bordadas'] !== undefined ? row[colMap['bordadas']] : 0)
-    const enEst   = toNum(colMap['en_estampado'] !== undefined ? row[colMap['en_estampado']] : 0)
-    const estMp   = toNum(colMap['estampadas'] !== undefined ? row[colMap['estampadas']] : 0)
-    const enTrans = toNum(colMap['en_transfer'] !== undefined ? row[colMap['en_transfer']] : 0)
-    const transTerm = toNum(colMap['transfer_terminadas'] !== undefined ? row[colMap['transfer_terminadas']] : 0)
-    const enLav   = toNum(colMap['en_lavanderia'] !== undefined ? row[colMap['en_lavanderia']] : 0)
-    const lav     = toNum(colMap['lavadas'] !== undefined ? row[colMap['lavadas']] : 0)
-    const ing1ra  = toNum(colMap['ingresos_acabados_1ra'] !== undefined ? row[colMap['ingresos_acabados_1ra']] : 0)
-    const ing2da  = toNum(colMap['ingresos_acabados_2da'] !== undefined ? row[colMap['ingresos_acabados_2da']] : 0)
-    // PRENDAS REQUERIDAS OP es la misma para todas las partidas del OP → tomamos MAX
-    const totReq  = toNum(colMap['total_requeridas'] !== undefined ? row[colMap['total_requeridas']] : 0)
-    const linTxt  = colMap['linea_costura'] !== undefined ? String(row[colMap['linea_costura']] ?? '').trim() : ''
+    const areaVals: Record<string, number> = {}
+    for (const area of AREA_MAP) {
+      const v1 = area.col1 && `${area.field}_c1` in colIdx ? toNum(row[colIdx[`${area.field}_c1`]]) : 0
+      const v2 = `${area.field}_c2` in colIdx ? toNum(row[colIdx[`${area.field}_c2`]]) : 0
+      areaVals[area.field] = v1 + v2
+    }
 
     if (existing) {
-      existing.en_estanteria += est
-      existing.en_proceso += proc
-      existing.confeccionadas += conf
-      existing.en_bordado += enBord
-      existing.bordadas += bord
-      existing.en_estampado += enEst
-      existing.estampadas += estMp
-      existing.en_transfer += enTrans
-      existing.transfer_terminadas += transTerm
-      existing.en_lavanderia += enLav
-      existing.lavadas += lav
-      existing.ingresos_acabados_1ra += ing1ra
-      existing.ingresos_acabados_2da += ing2da
-      existing.en_acabados = existing.ingresos_acabados_1ra + existing.ingresos_acabados_2da
-      existing.piezas_acabadas = existing.en_acabados
-      // PRENDAS REQUERIDAS OP: tomar el máximo (es el total del OP, mismo para todas las partidas)
+      for (const area of AREA_MAP) existing[area.field] += areaVals[area.field]
       if (totReq > existing.total_requeridas) existing.total_requeridas = totReq
-      // RUTA: tomar el primero no vacío
-      if (!existing.ruta && rutaStr) existing.ruta = rutaStr
-      // Línea costura: concatenar distintos talleres
-      if (linTxt && !existing.linea_costura.includes(linTxt)) {
-        existing.linea_costura = existing.linea_costura
-          ? `${existing.linea_costura} / ${linTxt}`
-          : linTxt
-      }
+      if (!existing.ruta && ruta) existing.ruta = ruta
     } else {
       acum.set(key, {
         po,
+        op,
         cliente,
-        color: colorRaw,
-        ruta: rutaStr,
-        en_estanteria: est,
-        en_proceso: proc,
-        confeccionadas: conf,
-        en_bordado: enBord,
-        bordadas: bord,
-        en_estampado: enEst,
-        estampadas: estMp,
-        en_transfer: enTrans,
-        transfer_terminadas: transTerm,
-        en_lavanderia: enLav,
-        lavadas: lav,
-        ingresos_acabados_1ra: ing1ra,
-        ingresos_acabados_2da: ing2da,
-        en_acabados: ing1ra + ing2da,
-        piezas_acabadas: ing1ra + ing2da,
-        total_requeridas: totReq,
-        linea_costura: linTxt,
+        color,
+        ruta,
+        en_corte:          areaVals['en_corte'],
+        en_bordado:        areaVals['en_bordado'],
+        en_costura:        areaVals['en_costura'],
+        en_estampado:      areaVals['en_estampado'],
+        en_estampado_ext:  areaVals['en_estampado_ext'],
+        en_lavanderia:     areaVals['en_lavanderia'],
+        en_costura_lineas: areaVals['en_costura_lineas'],
+        en_acabado:        areaVals['en_acabado'],
+        apt:               areaVals['apt'],
+        total_requeridas:  totReq,
       })
     }
   }
 
   const rows = Array.from(acum.values())
-
   return { rows, leidas, validas: rows.length, omitidas, errores, columnasFaltantes }
 }

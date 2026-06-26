@@ -22,33 +22,21 @@ export interface PgoRow {
 
 export interface CortesRow {
   po: string
+  op: string
   cliente: string
   color: string
-  ruta: string              // "(CORTE),(COSTURA),(ACABADO)"
-  // Costura
-  en_estanteria: number     // piezas esperando costura
-  en_proceso: number        // piezas siendo cosidas
-  confeccionadas: number    // salida de costura (van a siguiente etapa)
-  // Bordado
-  en_bordado: number
-  bordadas: number
-  // Estampado
-  en_estampado: number
-  estampadas: number
-  // Transfer
-  en_transfer: number
-  transfer_terminadas: number
-  // Lavandería
-  en_lavanderia: number
-  lavadas: number
-  // Acabados (única etapa final: ingreso = lista para auditar, no hay columna de salida)
-  ingresos_acabados_1ra: number  // INGRESOS ACABADOS 1RA
-  ingresos_acabados_2da: number  // INGRESOS ACABADOS 2DA
-  en_acabados: number            // = ingresos_acabados_1ra + ingresos_acabados_2da
-  piezas_acabadas: number        // = en_acabados (no existe columna de "salida" de acabados)
-  // Totales
-  total_requeridas: number  // PRENDAS REQUERIDAS OP
-  linea_costura: string     // nombre del taller/línea de costura (texto)
+  ruta: string
+  // Prendas en cada área = Columna01 + Columna02 (según Hoja2 del reporte)
+  en_corte: number          // Por Cortar + En Corte
+  en_bordado: number        // Bordado Pza + Bordado Pda
+  en_costura: number        // Estanteria + Costura Proceso
+  en_estampado: number      // Estampado Pza Chincha + Estampado Pda Chincha
+  en_estampado_ext: number  // Estampado Pza Ext + Estampado Pda Ext
+  en_lavanderia: number     // Lavanderia_Pda
+  en_costura_lineas: number // Costura Lineas
+  en_acabado: number        // Acabado
+  apt: number               // Apt (prendas listas)
+  total_requeridas: number  // Requerida
 }
 
 // ─── Ítem cruzado principal ────────────────────────────────────────────────────
@@ -67,32 +55,20 @@ export interface ItemCruzado {
   auditoria: Date | null
   auditoria_final: Date | null
   // Ruta de producción
+  op: string
   ruta: string
-  // Costura
-  en_estanteria: number
-  en_proceso: number
-  confeccionadas: number
-  // Bordado
+  // Prendas en cada área (de rptReporteSituacionOrdenes)
+  en_corte: number
   en_bordado: number
-  bordadas: number
-  // Estampado
+  en_costura: number
   en_estampado: number
-  estampadas: number
-  // Transfer
-  en_transfer: number
-  transfer_terminadas: number
-  // Lavandería
+  en_estampado_ext: number
   en_lavanderia: number
-  lavadas: number
-  // Acabados
-  ingresos_acabados_1ra: number
-  ingresos_acabados_2da: number
-  en_acabados: number
-  piezas_acabadas: number
-  // Totales cortes
+  en_costura_lineas: number
+  en_acabado: number
+  apt: number
   total_requeridas: number
-  linea_costura: string
-  // true si el PO no aparece en Status Cortes → se asume producción 100% cerrada (ya en bodega)
+  // true si el PO no aparece en el reporte → producción 100% cerrada (ya en bodega)
   produccion_cerrada: boolean
   // Semáforo
   dias_fin_entrega: number | null

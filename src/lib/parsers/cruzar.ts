@@ -58,15 +58,13 @@ export function cruzarDatos(
     if (pgo) conPgo++
     else sinPgo.add(crucePO)
 
-    // Si el PO no aparece en Status Cortes, se asume que ya salió de producción
-    // (producción 100% cerrada, lista para auditar) en vez de marcarlo como dato faltante.
+    // Si el PO no aparece en el reporte, se asume producción 100% cerrada (ya en bodega).
     const produccionCerrada = corte === null
     if (corte) conCortes++
     else cerrados.add(crucePO)
 
     const totalRequeridas = corte?.total_requeridas ?? (produccionCerrada ? aud.cant_prog ?? 0 : 0)
-    const piezasAcabadas  = corte?.piezas_acabadas  ?? (produccionCerrada ? aud.cant_prog ?? 0 : 0)
-    const enAcabados      = corte?.en_acabados      ?? (produccionCerrada ? aud.cant_prog ?? 0 : 0)
+    const aptFallback     = produccionCerrada ? aud.cant_prog ?? 0 : 0
 
     const diasFinal = diasRestantes(pgo?.auditoria_final ?? null)
     const item_key  = makeItemKey(aud.po, aud.color, aud.semana)
@@ -81,28 +79,22 @@ export function cruzarDatos(
       cant_prog:   aud.cant_prog,
       externa:     aud.externa,
       // PGO
-      fin_entrega:    pgo?.fin_entrega    ?? null,
-      auditoria:      pgo?.auditoria      ?? null,
+      fin_entrega:    pgo?.fin_entrega     ?? null,
+      auditoria:      pgo?.auditoria       ?? null,
       auditoria_final: pgo?.auditoria_final ?? null,
-      // Ruta y etapas de producción (de Cortes)
+      // Posición en producción (de rptReporteSituacionOrdenes)
+      op:                  corte?.op                  ?? '',
       ruta:                corte?.ruta                ?? '',
-      en_estanteria:       corte?.en_estanteria       ?? 0,
-      en_proceso:          corte?.en_proceso          ?? 0,
-      confeccionadas:      corte?.confeccionadas      ?? 0,
+      en_corte:            corte?.en_corte            ?? 0,
       en_bordado:          corte?.en_bordado          ?? 0,
-      bordadas:            corte?.bordadas            ?? 0,
+      en_costura:          corte?.en_costura          ?? 0,
       en_estampado:        corte?.en_estampado        ?? 0,
-      estampadas:          corte?.estampadas          ?? 0,
-      en_transfer:         corte?.en_transfer         ?? 0,
-      transfer_terminadas: corte?.transfer_terminadas ?? 0,
+      en_estampado_ext:    corte?.en_estampado_ext    ?? 0,
       en_lavanderia:       corte?.en_lavanderia       ?? 0,
-      lavadas:             corte?.lavadas             ?? 0,
-      ingresos_acabados_1ra: corte?.ingresos_acabados_1ra ?? 0,
-      ingresos_acabados_2da: corte?.ingresos_acabados_2da ?? 0,
-      en_acabados:         enAcabados,
-      piezas_acabadas:     piezasAcabadas,
+      en_costura_lineas:   corte?.en_costura_lineas   ?? 0,
+      en_acabado:          corte?.en_acabado          ?? 0,
+      apt:                 corte?.apt                 ?? aptFallback,
       total_requeridas:    totalRequeridas,
-      linea_costura:       corte?.linea_costura       ?? '',
       produccion_cerrada:  produccionCerrada,
       // Semáforo
       dias_fin_entrega:    diasRestantes(pgo?.fin_entrega ?? null),
