@@ -16,14 +16,15 @@ interface Props {
 type BadgeVariant = 'verde' | 'ambar' | 'rojo' | 'brand' | 'slate' | 'teal' | 'cyan'
 
 const ESTADO_VARIANT: Record<EstadoEfectivo, BadgeVariant> = {
-  Pendiente:       'slate',
-  Finalizando:     'brand',
-  'Por Finalizar': 'ambar',
+  Exportado:       'verde',
+  Cerrado:         'teal',
   'Por auditar':   'cyan',
+  'Por Finalizar': 'ambar',
+  Finalizando:     'brand',
+  Pendiente:       'slate',
   Programada:      'brand',
   'En proceso':    'teal',
   Reprogramada:    'ambar',
-  Cerrado:         'teal',
   Aprobada:        'verde',
   Rechazada:       'rojo',
 }
@@ -117,7 +118,10 @@ function RowItem({ item, onClick }: { item: ItemCruzado; onClick: () => void }) 
       <td className="px-4 py-2.5">
         {(() => {
           const efec = estadoEfectivo(item)
-          return <Badge variant={ESTADO_VARIANT[efec]}>{efec}</Badge>
+          const label = efec === 'Exportado' && item.porc_exp > 0
+            ? `Exportado ${Math.round(item.porc_exp)}%`
+            : efec
+          return <Badge variant={ESTADO_VARIANT[efec]}>{label}</Badge>
         })()}
       </td>
       <td className="px-4 py-2.5 text-sm text-ink-muted">{item.responsable || '—'}</td>

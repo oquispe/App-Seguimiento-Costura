@@ -19,8 +19,8 @@ interface Props {
 }
 
 const ESTADOS: EstadoEfectivo[] = [
-  'Pendiente', 'Finalizando', 'Por Finalizar', 'Por auditar',
-  'Programada', 'En proceso', 'Reprogramada', 'Cerrado',
+  'Exportado', 'Cerrado', 'Por auditar', 'Por Finalizar', 'Finalizando',
+  'Pendiente', 'Programada', 'En proceso', 'Reprogramada',
 ]
 const SEMAFOROS: { value: Semaforo; label: string }[] = [
   { value: 'rojo', label: 'Rojo (urgente)' },

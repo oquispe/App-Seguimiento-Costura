@@ -15,6 +15,7 @@ const PIPELINE = [
 
 export type EstadoEfectivo =
   | ItemCruzado['estado']
+  | 'Exportado'
   | 'Cerrado'
   | 'Por auditar'
   | 'Por Finalizar'
@@ -61,14 +62,15 @@ export function ubicacionActual(item: ItemCruzado): UbicacionEtapa[] {
  * Resto                         → Pendiente
  */
 export function estadoEfectivo(item: ItemCruzado): EstadoEfectivo {
-  if (item.estado === 'Aprobada' || item.estado === 'Rechazada') return 'Cerrado'
-  if (item.estado !== 'Pendiente') return item.estado
+  if (item.exportado > 0)                                          return 'Exportado'
+  if (item.estado === 'Aprobada' || item.estado === 'Rechazada')  return 'Cerrado'
+  if (item.estado !== 'Pendiente')                                 return item.estado
 
-  if (item.produccion_cerrada || item.apt > 0) return 'Por auditar'
+  if (item.produccion_cerrada || item.apt > 0)                    return 'Por auditar'
 
   const total = totalOrden(item)
   if (item.en_acabado > 0 && total > 0 && item.en_acabado >= total) return 'Por Finalizar'
-  if (item.en_acabado > 0) return 'Finalizando'
+  if (item.en_acabado > 0)                                          return 'Finalizando'
 
   return 'Pendiente'
 }

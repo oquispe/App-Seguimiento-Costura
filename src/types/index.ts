@@ -36,6 +36,8 @@ export interface CortesRow {
   en_costura_lineas: number // Costura Lineas
   en_acabado: number        // Acabado
   apt: number               // Apt (prendas listas)
+  exportado: number         // Exportado
+  porc_exp: number          // Porc Exp (% exportado)
   total_requeridas: number  // Requerida
 }
 
@@ -67,6 +69,8 @@ export interface ItemCruzado {
   en_costura_lineas: number
   en_acabado: number
   apt: number
+  exportado: number
+  porc_exp: number
   total_requeridas: number
   // true si el PO no aparece en el reporte → producción 100% cerrada (ya en bodega)
   produccion_cerrada: boolean

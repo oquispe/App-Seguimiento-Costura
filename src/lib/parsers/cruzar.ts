@@ -94,6 +94,8 @@ export function cruzarDatos(
       en_costura_lineas:   corte?.en_costura_lineas   ?? 0,
       en_acabado:          corte?.en_acabado          ?? 0,
       apt:                 corte?.apt                 ?? aptFallback,
+      exportado:           corte?.exportado           ?? 0,
+      porc_exp:            corte?.porc_exp            ?? 0,
       total_requeridas:    totalRequeridas,
       produccion_cerrada:  produccionCerrada,
       // Semáforo

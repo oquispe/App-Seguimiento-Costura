@@ -17,6 +17,8 @@ const ID_ALIAS: Record<string, string> = {
   'RUTA_GENERAL':   'ruta',
   'RUTA GENERAL':   'ruta',
   'REQUERIDA':      'total_requeridas',
+  'EXPORTADO':      'exportado',
+  'PORC EXP':       'porc_exp',
 }
 
 // Mapeo Hoja2: field → [col1 normalizada, col2 normalizada]
@@ -109,6 +111,8 @@ export function parseCortes(
     const color   = 'color' in colIdx   ? String(row[colIdx['color']] ?? '').trim() : ''
     const ruta    = 'ruta' in colIdx    ? String(row[colIdx['ruta']] ?? '').trim() : ''
     const totReq  = 'total_requeridas' in colIdx ? toNum(row[colIdx['total_requeridas']]) : 0
+    const expQty  = 'exportado' in colIdx ? toNum(row[colIdx['exportado']]) : 0
+    const expPct  = 'porc_exp'  in colIdx ? toNum(row[colIdx['porc_exp']])  : 0
 
     const key = `${po}|${normalize(color)}`
     const existing = acum.get(key)
@@ -122,6 +126,8 @@ export function parseCortes(
 
     if (existing) {
       for (const area of AREA_MAP) existing[area.field] += areaVals[area.field]
+      existing.exportado += expQty
+      if (expPct > existing.porc_exp) existing.porc_exp = expPct
       if (totReq > existing.total_requeridas) existing.total_requeridas = totReq
       if (!existing.ruta && ruta) existing.ruta = ruta
     } else {
@@ -140,6 +146,8 @@ export function parseCortes(
         en_costura_lineas: areaVals['en_costura_lineas'],
         en_acabado:        areaVals['en_acabado'],
         apt:               areaVals['apt'],
+        exportado:         expQty,
+        porc_exp:          expPct,
         total_requeridas:  totReq,
       })
     }
