@@ -4,8 +4,8 @@ import { es } from 'date-fns/locale'
 import { ChevronRight, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { SemaforoDot } from '../ui/Semaforo'
 import { Badge } from '../ui/Badge'
-import { ubicacionActual, estaListoParaAuditar, estadoEfectivo } from '../../lib/posicion'
-import type { ItemCruzado, EstadoAuditoria, CompromisosEtapas } from '../../types'
+import { ubicacionActual, estaListoParaAuditar, estadoEfectivo, type EstadoEfectivo } from '../../lib/posicion'
+import type { ItemCruzado, CompromisosEtapas } from '../../types'
 
 interface Props {
   items: ItemCruzado[]
@@ -13,13 +13,19 @@ interface Props {
   agruparPor: 'semana' | 'cliente' | 'ninguno'
 }
 
-const ESTADO_VARIANT: Record<EstadoAuditoria, 'verde' | 'ambar' | 'rojo' | 'brand' | 'slate' | 'teal'> = {
-  Aprobada:    'verde',
-  Rechazada:   'rojo',
-  Pendiente:   'slate',
-  Programada:  'brand',
-  'En proceso': 'teal',
-  Reprogramada: 'ambar',
+type BadgeVariant = 'verde' | 'ambar' | 'rojo' | 'brand' | 'slate' | 'teal' | 'cyan'
+
+const ESTADO_VARIANT: Record<EstadoEfectivo, BadgeVariant> = {
+  Pendiente:       'slate',
+  Finalizando:     'brand',
+  'Por Finalizar': 'ambar',
+  'Por auditar':   'cyan',
+  Programada:      'brand',
+  'En proceso':    'teal',
+  Reprogramada:    'ambar',
+  Cerrado:         'teal',
+  Aprobada:        'verde',
+  Rechazada:       'rojo',
 }
 
 function fmtDate(d: Date | null | undefined): string {
@@ -109,11 +115,10 @@ function RowItem({ item, onClick }: { item: ItemCruzado; onClick: () => void }) 
         </div>
       </td>
       <td className="px-4 py-2.5">
-        {estadoEfectivo(item) === 'Por auditar' ? (
-          <Badge variant="cyan">Por auditar</Badge>
-        ) : (
-          <Badge variant={ESTADO_VARIANT[item.estado]}>{item.estado}</Badge>
-        )}
+        {(() => {
+          const efec = estadoEfectivo(item)
+          return <Badge variant={ESTADO_VARIANT[efec]}>{efec}</Badge>
+        })()}
       </td>
       <td className="px-4 py-2.5 text-sm text-ink-muted">{item.responsable || '—'}</td>
       <td className="px-4 py-2.5">

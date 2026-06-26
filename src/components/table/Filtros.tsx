@@ -1,11 +1,11 @@
 import type { ItemCruzado, EstadoAuditoria, LlaveCruce } from '../../types'
 import type { Semaforo } from '../../lib/parsers/dateUtils'
-import { estadoEfectivo } from '../../lib/posicion'
+import { estadoEfectivo, type EstadoEfectivo } from '../../lib/posicion'
 
 export interface Filtros {
   cliente: string
   semana: string
-  estado: EstadoAuditoria | 'Por auditar' | ''
+  estado: EstadoEfectivo | ''
   responsable: string
   semaforo: Semaforo | ''
 }
@@ -18,7 +18,10 @@ interface Props {
   onLlaveChange: (l: LlaveCruce) => void
 }
 
-const ESTADOS: (EstadoAuditoria | 'Por auditar')[] = ['Pendiente', 'Por auditar', 'Programada', 'En proceso', 'Aprobada', 'Rechazada', 'Reprogramada']
+const ESTADOS: EstadoEfectivo[] = [
+  'Pendiente', 'Finalizando', 'Por Finalizar', 'Por auditar',
+  'Programada', 'En proceso', 'Reprogramada', 'Cerrado',
+]
 const SEMAFOROS: { value: Semaforo; label: string }[] = [
   { value: 'rojo', label: 'Rojo (urgente)' },
   { value: 'ambar', label: 'Ámbar (próximo)' },

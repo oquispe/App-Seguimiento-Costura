@@ -13,10 +13,16 @@ const PIPELINE = [
   { key: 'apt',            label: 'APT',             field: 'apt' },
 ] as const
 
+export type EstadoEfectivo =
+  | ItemCruzado['estado']
+  | 'Cerrado'
+  | 'Por auditar'
+  | 'Por Finalizar'
+  | 'Finalizando'
+
 export interface UbicacionEtapa {
   key: string
   label: string
-  /** piezas que están en esta área ahora mismo */
   cantidad: number
   ok: boolean
 }
@@ -25,17 +31,14 @@ export function totalOrden(item: ItemCruzado): number {
   return item.total_requeridas || item.cant_prog || 0
 }
 
-/** Producción 100% terminada: cerrada (sin fila en reporte) o todas las prendas en APT. */
+/** true cuando todas las prendas están en APT (o producción cerrada). */
 export function estaListoParaAuditar(item: ItemCruzado): boolean {
   if (item.produccion_cerrada) return true
   const total = totalOrden(item)
   return total > 0 && item.apt >= total
 }
 
-/**
- * Retorna las áreas donde hay prendas ahora mismo, en orden del pipeline.
- * Cada área con cantidad > 0 aparece en el resultado.
- */
+/** Retorna las áreas donde hay prendas ahora mismo, en orden del pipeline. */
 export function ubicacionActual(item: ItemCruzado): UbicacionEtapa[] {
   return PIPELINE
     .map(({ key, label, field }) => ({
@@ -48,9 +51,24 @@ export function ubicacionActual(item: ItemCruzado): UbicacionEtapa[] {
 }
 
 /**
- * Estado efectivo: si sigue en "Pendiente" pero producción terminada → "Por auditar".
+ * Estado visible en el tablero.
+ *
+ * Aprobada / Rechazada          → Cerrado
+ * Programada / En proceso / ... → se respeta el estado manual
+ * Pendiente + apt > 0           → Por auditar
+ * Pendiente + en_acabado ≥ total → Por Finalizar
+ * Pendiente + en_acabado > 0    → Finalizando
+ * Resto                         → Pendiente
  */
-export function estadoEfectivo(item: ItemCruzado): ItemCruzado['estado'] | 'Por auditar' {
-  if (item.estado === 'Pendiente' && estaListoParaAuditar(item)) return 'Por auditar'
-  return item.estado
+export function estadoEfectivo(item: ItemCruzado): EstadoEfectivo {
+  if (item.estado === 'Aprobada' || item.estado === 'Rechazada') return 'Cerrado'
+  if (item.estado !== 'Pendiente') return item.estado
+
+  if (item.produccion_cerrada || item.apt > 0) return 'Por auditar'
+
+  const total = totalOrden(item)
+  if (item.en_acabado > 0 && total > 0 && item.en_acabado >= total) return 'Por Finalizar'
+  if (item.en_acabado > 0) return 'Finalizando'
+
+  return 'Pendiente'
 }

@@ -30,8 +30,9 @@ function RutaProgreso({ item }: { item: ItemCruzado }) {
       <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex items-center gap-2">
         <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
         <span className="text-sm font-medium text-emerald-700">
-          Producción completa — listo para auditar
-          {item.produccion_cerrada && ' (sin fila en Status Cortes)'}
+          {item.produccion_cerrada
+            ? 'Producción cerrada — listo para auditar'
+            : `Todas las prendas en APT (${item.apt}) — listo para auditar`}
         </span>
       </div>
     )
