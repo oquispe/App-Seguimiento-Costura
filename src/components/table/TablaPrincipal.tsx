@@ -19,6 +19,7 @@ const ESTADO_VARIANT: Record<EstadoEfectivo, BadgeVariant> = {
   Exportado:       'verde',
   Cerrado:         'teal',
   'Por auditar':   'cyan',
+  'Sin datos':     'rojo',
   'Por Finalizar': 'ambar',
   Finalizando:     'brand',
   Pendiente:       'slate',

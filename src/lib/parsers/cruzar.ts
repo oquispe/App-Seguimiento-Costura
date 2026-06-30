@@ -81,7 +81,7 @@ export function cruzarDatos(
 
   const items: ItemCruzado[] = []
   const sinPgo: Set<string> = new Set()
-  const cerrados: Set<string> = new Set()
+  const sinMatch: { po: string; color: string }[] = []
   let conPgo = 0
   let conCortes = 0
 
@@ -101,13 +101,13 @@ export function cruzarDatos(
     if (pgo) conPgo++
     else sinPgo.add(crucePO)
 
-    // Si no aparece en el reporte → producción cerrada (bodega/APT)
+    // Si no aparece en el reporte → sin datos de producción
     const produccionCerrada = corte === null
     if (corte) conCortes++
-    else cerrados.add(crucePO)
+    else sinMatch.push({ po: aud.po, color: aud.color })
 
-    const totalRequeridas = corte?.total_requeridas ?? (produccionCerrada ? aud.cant_prog ?? 0 : 0)
-    const aptFallback     = produccionCerrada ? aud.cant_prog ?? 0 : 0
+    const totalRequeridas = corte?.total_requeridas ?? (aud.cant_prog ?? 0)
+    const aptFallback     = 0
 
     const diasFinal  = diasRestantes(pgo?.auditoria_final ?? null)
     const item_key   = makeItemKey(aud.po, aud.color, aud.semana)
@@ -167,7 +167,7 @@ export function cruzarDatos(
       con_pgo:    conPgo,
       sin_pgo:    Array.from(sinPgo),
       con_cortes: conCortes,
-      cerrados:   Array.from(cerrados),
+      sin_match:  sinMatch,
     },
   }
 }

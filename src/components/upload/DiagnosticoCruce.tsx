@@ -16,25 +16,42 @@ export function PanelDiagnostico({ diagnostico: d }: Props) {
       <div className="grid grid-cols-4 gap-4 mb-4">
         <Stat label="Auditorías totales" value={d.total_auditorias} />
         <Stat label="Con PGO" value={d.con_pgo} of={d.total_auditorias} />
-        <Stat label="En proceso (con Cortes)" value={d.con_cortes} of={d.total_auditorias} />
-        <Stat label="Cerrados (por auditar)" value={d.cerrados.length} of={d.total_auditorias} />
+        <Stat label="Con datos en Status" value={d.con_cortes} of={d.total_auditorias} />
+        <Stat
+          label="Sin datos en Status"
+          value={d.sin_match.length}
+          of={d.total_auditorias}
+          alert={d.sin_match.length > 0}
+        />
       </div>
 
       {d.sin_pgo.length > 0 && (
-        <Details title={`POs sin PGO (${d.sin_pgo.length})`} items={d.sin_pgo} color="amber" />
+        <DetailsPO
+          title={`POs sin PGO (${d.sin_pgo.length})`}
+          items={d.sin_pgo}
+          color="amber"
+        />
       )}
-      {d.cerrados.length > 0 && (
-        <Details title={`Cerrados — sin fila en Cortes, listos para auditar (${d.cerrados.length})`} items={d.cerrados} color="slate" />
+
+      {d.sin_match.length > 0 && (
+        <DetailsItems
+          title={`Sin match en Status — revisar color o PO (${d.sin_match.length})`}
+          items={d.sin_match}
+        />
       )}
     </div>
   )
 }
 
-function Stat({ label, value, of: total }: { label: string; value: number; of?: number }) {
+function Stat({ label, value, of: total, alert }: {
+  label: string; value: number; of?: number; alert?: boolean
+}) {
   const pct = total ? Math.round((value / total) * 100) : null
   return (
     <div className="text-center">
-      <div className="text-2xl font-bold text-ink">{value}</div>
+      <div className={`text-2xl font-bold ${alert && value > 0 ? 'text-red-600' : 'text-ink'}`}>
+        {value}
+      </div>
       <div className="text-xs text-ink-muted mt-0.5">{label}</div>
       {pct !== null && (
         <div className="text-xs text-ink-muted">({pct}%)</div>
@@ -43,8 +60,10 @@ function Stat({ label, value, of: total }: { label: string; value: number; of?: 
   )
 }
 
-function Details({ title, items, color }: { title: string; items: string[]; color: 'amber' | 'slate' }) {
-  const cls = color === 'amber' ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-slate-50 border-slate-200 text-slate-600'
+function DetailsPO({ title, items, color }: { title: string; items: string[]; color: 'amber' | 'slate' }) {
+  const cls = color === 'amber'
+    ? 'bg-amber-50 border-amber-200 text-amber-700'
+    : 'bg-slate-50 border-slate-200 text-slate-600'
   return (
     <details className={`mt-2 border rounded-lg p-3 ${cls}`}>
       <summary className="cursor-pointer text-xs font-medium">{title}</summary>
@@ -52,6 +71,24 @@ function Details({ title, items, color }: { title: string; items: string[]; colo
         {items.map((po) => (
           <span key={po} className="bg-white border border-current/20 rounded px-2 py-0.5 text-xs font-mono">
             {po}
+          </span>
+        ))}
+      </div>
+    </details>
+  )
+}
+
+function DetailsItems({ title, items }: { title: string; items: { po: string; color: string }[] }) {
+  return (
+    <details className="mt-2 border border-red-200 rounded-lg p-3 bg-red-50 text-red-700" open>
+      <summary className="cursor-pointer text-xs font-medium">{title}</summary>
+      <p className="text-xs mt-1 mb-2 text-red-600">
+        Estos ítems no se encontraron en el Status de producción. Pueden estar exportados, o el color puede tener un nombre diferente en el Excel de Auditorías. En el tablero aparecen como <strong>"Sin datos"</strong>.
+      </p>
+      <div className="mt-2 flex flex-wrap gap-1.5 max-h-40 overflow-auto">
+        {items.map((it, i) => (
+          <span key={i} className="bg-white border border-red-200 rounded px-2 py-0.5 text-xs font-mono">
+            {it.po} · {it.color}
           </span>
         ))}
       </div>

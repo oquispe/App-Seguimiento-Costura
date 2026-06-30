@@ -22,8 +22,8 @@ interface Props {
 
 // Orden de display: de más avanzado a más inicial
 const ESTADOS: EstadoEfectivo[] = [
-  'Exportado', 'Cerrado', 'Por auditar', 'Por Finalizar', 'Finalizando',
-  'Pendiente', 'Programada', 'En proceso', 'Reprogramada',
+  'Exportado', 'Cerrado', 'Por auditar', 'Sin datos',
+  'Por Finalizar', 'Finalizando', 'Pendiente', 'Programada', 'En proceso', 'Reprogramada',
 ]
 
 const SEMAFOROS: { value: Semaforo; label: string }[] = [
@@ -38,6 +38,7 @@ const CHIP: Record<string, string> = {
   'Exportado':     'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200',
   'Cerrado':       'bg-teal-100    text-teal-800    border-teal-300    hover:bg-teal-200',
   'Por auditar':   'bg-cyan-100    text-cyan-800    border-cyan-300    hover:bg-cyan-200',
+  'Sin datos':     'bg-red-100     text-red-800     border-red-300     hover:bg-red-200',
   'Por Finalizar': 'bg-amber-100   text-amber-800   border-amber-300   hover:bg-amber-200',
   'Finalizando':   'bg-indigo-100  text-indigo-800  border-indigo-300  hover:bg-indigo-200',
   'Pendiente':     'bg-slate-100   text-slate-700   border-slate-300   hover:bg-slate-200',
@@ -51,6 +52,7 @@ const LEYENDA: { estado: EstadoEfectivo; desc: string }[] = [
   { estado: 'Exportado',     desc: 'Prendas despachadas al cliente' },
   { estado: 'Cerrado',       desc: 'Auditoría completada (aprobada o rechazada)' },
   { estado: 'Por auditar',   desc: 'Prendas en APT — listas para auditar' },
+  { estado: 'Sin datos',     desc: 'PO+Color no encontrado en el Status — revisar si el color coincide o si ya salió del sistema' },
   { estado: 'Por Finalizar', desc: 'Todas las prendas llegaron a Acabado, faltan pasar a APT' },
   { estado: 'Finalizando',   desc: 'Parte de las prendas están en Acabado' },
   { estado: 'Programada',    desc: 'Fecha de auditoría coordinada' },

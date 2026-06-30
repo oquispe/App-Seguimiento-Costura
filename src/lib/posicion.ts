@@ -20,6 +20,7 @@ export type EstadoEfectivo =
   | 'Por auditar'
   | 'Por Finalizar'
   | 'Finalizando'
+  | 'Sin datos'
 
 export interface UbicacionEtapa {
   key: string
@@ -66,7 +67,10 @@ export function estadoEfectivo(item: ItemCruzado): EstadoEfectivo {
   if (item.estado === 'Aprobada' || item.estado === 'Rechazada')  return 'Cerrado'
   if (item.estado !== 'Pendiente')                                 return item.estado
 
-  if (item.produccion_cerrada || item.apt > 0)                    return 'Por auditar'
+  // Sin match en el Status: no se sabe dónde están las prendas
+  if (item.produccion_cerrada)                                     return 'Sin datos'
+
+  if (item.apt > 0)                                                return 'Por auditar'
 
   const total = totalOrden(item)
   if (item.en_acabado > 0 && total > 0 && item.en_acabado >= total) return 'Por Finalizar'

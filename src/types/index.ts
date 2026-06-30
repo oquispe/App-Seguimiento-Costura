@@ -142,8 +142,8 @@ export interface DiagnosticoCruce {
   con_pgo: number
   sin_pgo: string[]
   con_cortes: number
-  // POs sin fila en Status Cortes: se asumen cerrados (producción terminada, listos para auditar)
-  cerrados: string[]
+  // Ítems sin match en Status (PO+Color): produccion_cerrada=true
+  sin_match: { po: string; color: string }[]
 }
 
 // ─── Mapeo manual de columnas ─────────────────────────────────────────────────
