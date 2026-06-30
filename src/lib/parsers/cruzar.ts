@@ -10,12 +10,30 @@ import type {
 } from '../../types'
 
 /**
- * Quita el prefijo numérico de código de color.
- * "0421 - Breaker Blue" → "BREAKER BLUE"
- * "NAVY BLUE"           → "NAVY BLUE"
+ * Normaliza el color para matching flexible:
+ * 1. "NAVY - NAVY"         → "NAVY"          (duplicado separado por guión)
+ * 2. "0421 - Breaker Blue" → "BREAKER BLUE"  (código numérico al inicio)
+ * 3. "NAVY BLUE"           → "NAVY BLUE"     (sin cambio)
  */
 function stripColorCode(color: string): string {
-  return normalize(color).replace(/^\d{3,4}\s*[-–]\s*/, '').trim()
+  const norm = normalize(color)
+  const parts = norm.split(/\s*[-–]\s*/)
+  if (parts.length !== 2) return norm
+
+  const left  = parts[0].trim()
+  const right = parts[1].trim()
+
+  // Caso 1: "X - X" (mismo texto a ambos lados) → "X"
+  if (left === right) return left
+
+  // Caso 2: código numérico al inicio "0421 - Breaker Blue" → "BREAKER BLUE"
+  if (/^\d{3,5}$/.test(left)) return right
+
+  // Caso 3: código alfa-corto sin espacios "MRPNK - MELROSE PINK" → "MELROSE PINK"
+  // El código (izq) no tiene espacios, ≤8 chars y es más corto que el nombre (der)
+  if (!left.includes(' ') && left.length <= 8 && right.length > left.length) return right
+
+  return norm
 }
 
 /**
@@ -44,12 +62,32 @@ function buscarCorte(
   const exacto = candidatos.find(c => normalize(c.color) === auditColorNorm)
   if (exacto) return exacto
 
-  // 2. Sin código de color
+  // 2. Sin código de color (numérico o alfa-corto)
   const fuzzy = candidatos.find(c => stripColorCode(c.color) === auditColorStrip)
   if (fuzzy) return fuzzy
 
   // 3. Único color → no hay riesgo de cruzar datos entre colores distintos
   if (candidatos.length === 1) return candidatos[0]
+
+  // 4. Truncación: Status truncó el nombre del color
+  //    Ej: aud="WINDY BLUE / DARK OLIVE", sts="WINDY BLUE / DARK OL"
+  const truncado = candidatos.find(c => {
+    const cNorm = normalize(c.color)
+    return cNorm.length >= 5 && (
+      auditColorStrip.startsWith(cNorm) || auditColorNorm.startsWith(cNorm)
+    )
+  })
+  if (truncado) return truncado
+
+  // 5. Formato "ABREVIADO - NOMBRE COMPLETO" donde la abreviatura tiene espacios
+  //    Ej: aud="LAVENDER AURA/WINDWA - LAVENDER AURA/WINDWARD", sts="LAVENDER AURA/WINDWA"
+  //    Ej: aud="THE BUCK - PONDEROSA - THE BUCK - PONDEROSA GREEN/WHITE", sts="THE BUCK - PONDEROSA"
+  const partes = auditColorNorm.split(/\s*[-–]\s*/)
+  for (let len = 1; len < partes.length; len++) {
+    const prefijo = partes.slice(0, len).join(' - ')
+    const encontrado = candidatos.find(c => normalize(c.color) === prefijo)
+    if (encontrado) return encontrado
+  }
 
   return null
 }
