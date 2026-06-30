@@ -118,8 +118,13 @@ function RowItem({ item, onClick }: { item: ItemCruzado; onClick: () => void }) 
       <td className="px-4 py-2.5">
         {(() => {
           const efec = estadoEfectivo(item)
-          const label = efec === 'Exportado' && item.porc_exp > 0
-            ? `Exportado ${Math.round(item.porc_exp)}%`
+          const pctExp = item.porc_exp > 0
+            ? Math.round(item.porc_exp)
+            : item.total_requeridas > 0
+              ? Math.round((item.exportado / item.total_requeridas) * 100)
+              : 0
+          const label = efec === 'Exportado' && pctExp > 0
+            ? `Exportado ${pctExp}%`
             : efec
           return <Badge variant={ESTADO_VARIANT[efec]}>{label}</Badge>
         })()}

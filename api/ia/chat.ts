@@ -14,6 +14,7 @@ interface ItemCompacto {
   cliente: string
   estilo: string
   po: string
+  op: string
   color: string
   cant_prog: number | null
   externa: string | null
@@ -21,17 +22,18 @@ interface ItemCompacto {
   dias_auditoria_final: number | null
   auditoria_final: string | null
   fin_entrega: string | null
-  en_proceso: number
-  confeccionadas: number
+  en_corte: number
   en_bordado: number
-  bordadas: number
+  en_costura: number
   en_estampado: number
-  estampadas: number
+  en_estampado_ext: number
   en_lavanderia: number
-  en_acabados: number
-  piezas_acabadas: number
+  en_costura_lineas: number
+  en_acabado: number
+  apt: number
+  exportado: number
+  porc_exp: number
   total_requeridas: number
-  linea_costura: string
   estado: string
 }
 
@@ -43,16 +45,20 @@ function formatearItem(it: ItemCompacto): string {
   const ico = it.semaforo === 'rojo' ? '🔴' : it.semaforo === 'ambar' ? '🟡' : it.semaforo === 'verde' ? '🟢' : '⚪'
   const dias = it.dias_auditoria_final !== null ? `${it.dias_auditoria_final}d` : '?d'
   const etapas: string[] = []
-  if (it.en_proceso > 0)    etapas.push(`costura:${it.en_proceso}`)
-  if (it.en_bordado > 0)    etapas.push(`bordado:${it.en_bordado}`)
-  if (it.en_estampado > 0)  etapas.push(`estampado:${it.en_estampado}`)
-  if (it.en_lavanderia > 0) etapas.push(`lavand:${it.en_lavanderia}`)
-  if (it.en_acabados > 0)   etapas.push(`acabados:${it.en_acabados}`)
-  if (it.confeccionadas > 0) etapas.push(`confec:${it.confeccionadas}`)
+  if (it.en_corte > 0)           etapas.push(`corte:${it.en_corte}`)
+  if (it.en_bordado > 0)         etapas.push(`bordado:${it.en_bordado}`)
+  if (it.en_costura > 0)         etapas.push(`costura:${it.en_costura}`)
+  if (it.en_estampado > 0)       etapas.push(`estampado:${it.en_estampado}`)
+  if (it.en_estampado_ext > 0)   etapas.push(`estampExt:${it.en_estampado_ext}`)
+  if (it.en_lavanderia > 0)      etapas.push(`lavand:${it.en_lavanderia}`)
+  if (it.en_costura_lineas > 0)  etapas.push(`costLineas:${it.en_costura_lineas}`)
+  if (it.en_acabado > 0)         etapas.push(`acabado:${it.en_acabado}`)
+  if (it.apt > 0)                etapas.push(`APT:${it.apt}`)
+  if (it.exportado > 0)          etapas.push(`export:${it.exportado}(${Math.round(it.porc_exp)}%)`)
   const pos = etapas.length > 0 ? etapas.join('|') : 'sin mov'
-  const linea = it.linea_costura ? ` [${it.linea_costura}]` : ''
+  const op  = it.op ? ` OP:${it.op}` : ''
   const ext = it.externa ? ` EXT:${it.externa}` : ''
-  return `${ico} S${it.semana} ${it.cliente} | ${it.estilo} PO:${it.po} ${it.color} | ${it.cant_prog ?? '?'}pz${ext} | audit:${it.auditoria_final ?? '—'}(${dias}) | ${pos}${linea}`
+  return `${ico} S${it.semana} ${it.cliente} | ${it.estilo} PO:${it.po}${op} ${it.color} | ${it.cant_prog ?? '?'}pz${ext} | audit:${it.auditoria_final ?? '—'}(${dias}) | ${pos}`
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -74,7 +80,7 @@ Conoces el estado en tiempo real de todas las órdenes de confección y responde
 DATOS ACTUALES (${(items as unknown[]).length} ítems, ordenados por urgencia):
 ${resumen}
 
-LEYENDA: 🔴 vencido/≤3d | 🟡 4-7d | 🟢 >7d | ⚪ sin fecha | costura/bordado/estampado/lavand/acabados/confec = piezas en esa etapa | EXT = empresa externa | S = semana
+LEYENDA: 🔴 vencido/≤3d | 🟡 4-7d | 🟢 >7d | ⚪ sin fecha | corte/bordado/costura/estampado/lavand/acabado/APT/export = piezas en esa etapa | EXT = empresa externa | OP = orden de producción | S = semana
 
 CÓMO RESPONDER:
 - Prioridades de un área → lista ítems con piezas ahí, del más urgente al menos (primero 🔴, luego 🟡)

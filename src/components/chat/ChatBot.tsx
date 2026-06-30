@@ -53,6 +53,8 @@ function compactarItem(it: ItemCruzado) {
     en_costura_lineas:    pos['costura_lineas'] ?? 0,
     en_acabado:           pos['acabado']        ?? 0,
     apt:                  it.apt,
+    exportado:            it.exportado,
+    porc_exp:             it.porc_exp,
     total_requeridas:     it.total_requeridas,
     estado:               it.estado,
   }
