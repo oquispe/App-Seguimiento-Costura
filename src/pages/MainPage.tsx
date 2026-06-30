@@ -292,7 +292,7 @@ export function MainPage() {
                 result={state.parseResults.pgo}
               />
               <DropZone<CortesRow>
-                label="Status Cortes (hoja StatusCorte)"
+                label="Situación Órdenes (rptReporteSituacionOrdenesNew1)"
                 parse={parseCortes}
                 onParsed={(r) => setCortes(r)}
                 result={state.parseResults.cortes}
@@ -335,13 +335,13 @@ export function MainPage() {
 
             {/* ── Actualización parcial mid-semana ── */}
             <div className="border-t border-line pt-5">
-              <h3 className="text-sm font-semibold text-ink mb-1">Actualizar solo Status Cortes</h3>
+              <h3 className="text-sm font-semibold text-ink mb-1">Actualizar posición de producción</h3>
               <p className="text-xs text-ink-muted mb-3">
-                Para actualizar el avance de producción durante la semana sin volver a cargar Auditorías ni PGO.
+                Sube el archivo <span className="font-mono text-ink">rptReporteSituacionOrdenesNew1.xlsm</span> para actualizar el avance sin volver a cargar Auditorías ni PGO.
               </p>
               <div className="max-w-xs">
                 <DropZone<CortesRow>
-                  label="Status Cortes actualizado"
+                  label="rptReporteSituacionOrdenesNew1.xlsm"
                   parse={parseCortes}
                   onParsed={setCortesUpdate}
                   result={cortesUpdate}

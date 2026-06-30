@@ -17,9 +17,14 @@ export function DropZone<T>({ label, accept = '.xlsx,.xlsm,.xls', onParsed, pars
 
   const processFile = useCallback(
     async (file: File) => {
-      const buf = await file.arrayBuffer()
-      const res = parse(buf)
-      onParsed(res, buf)
+      try {
+        const buf = await file.arrayBuffer()
+        const res = parse(buf)
+        onParsed(res, buf)
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        onParsed({ rows: [], leidas: 0, validas: 0, omitidas: 0, errores: [`Error al leer el archivo: ${msg}`], columnasFaltantes: [] }, new ArrayBuffer(0))
+      }
     },
     [parse, onParsed]
   )
