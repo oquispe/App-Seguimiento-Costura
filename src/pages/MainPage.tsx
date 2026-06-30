@@ -278,25 +278,34 @@ export function MainPage() {
         {tab === 'carga' && (
           <div className="space-y-5">
             <h2 className="text-base font-semibold text-ink">Carga de archivos Excel</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <DropZone<AuditoriaRow>
-                label="Auditorías (hojas por semana)"
-                parse={parseAuditorias}
-                onParsed={handleParsedAuditorias}
-                result={state.parseResults.auditorias}
-              />
-              <DropZone<PgoRow>
-                label="PGO (hoja PGO)"
-                parse={parsePgo}
-                onParsed={(r) => setPgos(r)}
-                result={state.parseResults.pgo}
-              />
-              <DropZone<CortesRow>
-                label="Situación Órdenes (rptReporteSituacionOrdenesNew1)"
-                parse={parseCortes}
-                onParsed={(r) => setCortes(r)}
-                result={state.parseResults.cortes}
-              />
+            {/* Publicación semanal */}
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-sm font-semibold text-blue-800">📅 Publicación semanal (cada lunes)</span>
+              </div>
+              <p className="text-xs text-blue-700 mb-3">
+                Sube los 3 archivos para iniciar el seguimiento de la semana. Esto reemplaza la carga anterior y la comparte con todos los usuarios.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <DropZone<AuditoriaRow>
+                  label="Auditorías (hojas por semana)"
+                  parse={parseAuditorias}
+                  onParsed={handleParsedAuditorias}
+                  result={state.parseResults.auditorias}
+                />
+                <DropZone<PgoRow>
+                  label="PGO (hoja PGO)"
+                  parse={parsePgo}
+                  onParsed={(r) => setPgos(r)}
+                  result={state.parseResults.pgo}
+                />
+                <DropZone<CortesRow>
+                  label="Situación Órdenes (rptReporteSituacionOrdenesNew1)"
+                  parse={parseCortes}
+                  onParsed={(r) => setCortes(r)}
+                  result={state.parseResults.cortes}
+                />
+              </div>
             </div>
 
             {state.diagnostico && (
@@ -333,11 +342,13 @@ export function MainPage() {
               </>
             )}
 
-            {/* ── Actualización parcial mid-semana ── */}
-            <div className="border-t border-line pt-5">
-              <h3 className="text-sm font-semibold text-ink mb-1">Actualizar posición de producción</h3>
-              <p className="text-xs text-ink-muted mb-3">
-                Sube el archivo <span className="font-mono text-ink">rptReporteSituacionOrdenesNew1.xlsm</span> para actualizar el avance sin volver a cargar Auditorías ni PGO.
+            {/* ── Actualización diaria ── */}
+            <div className="bg-teal-50 border border-teal-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-sm font-semibold text-teal-800">🔄 Actualización diaria (martes a viernes)</span>
+              </div>
+              <p className="text-xs text-teal-700 mb-3">
+                Solo sube el <span className="font-mono font-semibold">rptReporteSituacionOrdenesNew1.xlsm</span> para ver dónde están las prendas hoy, sin tocar Auditorías ni PGO. Requiere que la semana ya esté publicada.
               </p>
               <div className="max-w-xs">
                 <DropZone<CortesRow>
