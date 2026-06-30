@@ -24,14 +24,13 @@ export function cruzarDatos(
     if (!pgoIdx.has(k)) pgoIdx.set(k, p)
   }
 
-  // Índice Cortes: preferir PO+COLOR exacto, fallback a PO
-  const cortesIdxFull = new Map<string, CortesRow>() // PO|COLOR
-  const cortesIdxPO   = new Map<string, CortesRow>() // solo PO (fallback)
+  // Índice Cortes: solo por PO+COLOR exacto
+  // No se usa fallback por PO solo para evitar que datos de un color
+  // contaminen a otro color del mismo PO
+  const cortesIdxFull = new Map<string, CortesRow>()
   for (const c of cortes) {
     const kFull = `${normalizePO(c.po)}|${normalize(c.color)}`
-    const kPO   = normalizePO(c.po)
     if (!cortesIdxFull.has(kFull)) cortesIdxFull.set(kFull, c)
-    if (!cortesIdxPO.has(kPO))   cortesIdxPO.set(kPO, c)
   }
 
   const items: ItemCruzado[] = []
@@ -50,10 +49,8 @@ export function cruzarDatos(
       : crucePO
     const pgo = pgoIdx.get(pgoKey) ?? null
 
-    // Cruce Cortes: intentar PO+COLOR primero, luego PO solo
-    const corte = cortesIdxFull.get(`${crucePO}|${cruceColor}`)
-               ?? cortesIdxPO.get(crucePO)
-               ?? null
+    // Cruce Cortes: solo PO+COLOR exacto
+    const corte = cortesIdxFull.get(`${crucePO}|${cruceColor}`) ?? null
 
     if (pgo) conPgo++
     else sinPgo.add(crucePO)
