@@ -63,29 +63,30 @@ export function parseCortes(
     return { rows: [], leidas, validas: 0, omitidas, errores, columnasFaltantes }
   }
 
-  // Leer cabecera (fila 0)
-  const headerRow = data[0] ?? []
+  // Auto-detectar fila de encabezados: buscar en las primeras 10 filas la que tenga "PO"
+  let headerRowIdx = -1
   const colIdx: Record<string, number> = {}
 
-  for (let c = 0; c < headerRow.length; c++) {
-    const norm = normalize(String(headerRow[c] ?? ''))
-    // Mapear identificadores
-    if (ID_ALIAS[norm] && !(ID_ALIAS[norm] in colIdx)) {
-      colIdx[ID_ALIAS[norm]] = c
+  for (let r = 0; r < Math.min(10, data.length); r++) {
+    const row = data[r] ?? []
+    const tempIdx: Record<string, number> = {}
+    for (let c = 0; c < row.length; c++) {
+      const norm = normalize(String(row[c] ?? ''))
+      if (ID_ALIAS[norm] && !(ID_ALIAS[norm] in tempIdx)) tempIdx[ID_ALIAS[norm]] = c
+      for (const area of AREA_MAP) {
+        if (area.col1 && norm === area.col1 && !(`${area.field}_c1` in tempIdx)) tempIdx[`${area.field}_c1`] = c
+        if (area.col2 && norm === area.col2 && !(`${area.field}_c2` in tempIdx)) tempIdx[`${area.field}_c2`] = c
+      }
     }
-    // Mapear columnas de área por nombre normalizado
-    for (const area of AREA_MAP) {
-      if (area.col1 && norm === area.col1 && !(`${area.field}_c1` in colIdx)) {
-        colIdx[`${area.field}_c1`] = c
-      }
-      if (area.col2 && norm === area.col2 && !(`${area.field}_c2` in colIdx)) {
-        colIdx[`${area.field}_c2`] = c
-      }
+    if ('po' in tempIdx) {
+      headerRowIdx = r
+      Object.assign(colIdx, tempIdx)
+      break
     }
   }
 
-  if (!('po' in colIdx)) {
-    errores.push(`Hoja "${sheetName}": no se encontró columna PO`)
+  if (headerRowIdx === -1) {
+    errores.push(`Hoja "${sheetName}": no se encontró columna PO en las primeras 10 filas`)
     return { rows: [], leidas, validas: 0, omitidas, errores, columnasFaltantes }
   }
 
@@ -95,10 +96,10 @@ export function parseCortes(
     if (area.col2 && !(`${area.field}_c2` in colIdx)) columnasFaltantes.push(`${area.field}:col2`)
   }
 
-  // Acumular por PO+COLOR
+  // Acumular por PO+COLOR (datos empiezan después del header detectado)
   const acum = new Map<string, CortesRow>()
 
-  for (let r = 1; r < data.length; r++) {
+  for (let r = headerRowIdx + 1; r < data.length; r++) {
     const row = data[r] ?? []
     const poRaw = row[colIdx['po']]
     const po = normalizePO(String(poRaw ?? ''))
