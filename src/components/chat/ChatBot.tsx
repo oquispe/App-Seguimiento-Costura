@@ -49,6 +49,7 @@ function compactarItem(it: ItemCruzado) {
     en_costura:           pos['costura']        ?? 0,
     en_estampado:         pos['estampado']      ?? 0,
     en_estampado_ext:     pos['estampado_ext']  ?? 0,
+    en_transfer:          pos['transfer']       ?? 0,
     en_lavanderia:        pos['lavanderia']     ?? 0,
     en_costura_lineas:    pos['costura_lineas'] ?? 0,
     en_acabado:           pos['acabado']        ?? 0,

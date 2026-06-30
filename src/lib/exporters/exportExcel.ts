@@ -46,6 +46,7 @@ export function exportarExcel(
     'En Costura': it.en_costura,
     'En Estampado': it.en_estampado,
     'En Estampado Ext': it.en_estampado_ext,
+    'En Transfer': it.en_transfer,
     'En Lavandería': it.en_lavanderia,
     'En Costura Líneas': it.en_costura_lineas,
     'En Acabado': it.en_acabado,

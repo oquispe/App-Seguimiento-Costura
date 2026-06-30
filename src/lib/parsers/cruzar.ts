@@ -133,6 +133,7 @@ export function cruzarDatos(
       en_costura:          corte?.en_costura          ?? 0,
       en_estampado:        corte?.en_estampado        ?? 0,
       en_estampado_ext:    corte?.en_estampado_ext    ?? 0,
+      en_transfer:         corte?.en_transfer         ?? 0,
       en_lavanderia:       corte?.en_lavanderia       ?? 0,
       en_costura_lineas:   corte?.en_costura_lineas   ?? 0,
       en_acabado:          corte?.en_acabado          ?? 0,

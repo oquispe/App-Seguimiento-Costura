@@ -27,6 +27,7 @@ interface ItemCompacto {
   en_costura: number
   en_estampado: number
   en_estampado_ext: number
+  en_transfer: number
   en_lavanderia: number
   en_costura_lineas: number
   en_acabado: number
@@ -50,6 +51,7 @@ function formatearItem(it: ItemCompacto): string {
   if (it.en_costura > 0)         etapas.push(`costura:${it.en_costura}`)
   if (it.en_estampado > 0)       etapas.push(`estampado:${it.en_estampado}`)
   if (it.en_estampado_ext > 0)   etapas.push(`estampExt:${it.en_estampado_ext}`)
+  if (it.en_transfer > 0)        etapas.push(`transfer:${it.en_transfer}`)
   if (it.en_lavanderia > 0)      etapas.push(`lavand:${it.en_lavanderia}`)
   if (it.en_costura_lineas > 0)  etapas.push(`costLineas:${it.en_costura_lineas}`)
   if (it.en_acabado > 0)         etapas.push(`acabado:${it.en_acabado}`)

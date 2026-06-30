@@ -32,6 +32,7 @@ export interface CortesRow {
   en_costura: number        // Estanteria + Costura Proceso
   en_estampado: number      // Estampado Pza Chincha + Estampado Pda Chincha
   en_estampado_ext: number  // Estampado Pza Ext + Estampado Pda Ext
+  en_transfer: number        // Transfer Pza + Transfer Pda
   en_lavanderia: number     // Lavanderia_Pda
   en_costura_lineas: number // Costura Lineas
   en_acabado: number        // Acabado
@@ -65,6 +66,7 @@ export interface ItemCruzado {
   en_costura: number
   en_estampado: number
   en_estampado_ext: number
+  en_transfer: number
   en_lavanderia: number
   en_costura_lineas: number
   en_acabado: number

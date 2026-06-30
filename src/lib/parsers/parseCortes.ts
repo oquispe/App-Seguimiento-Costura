@@ -25,13 +25,14 @@ const ID_ALIAS: Record<string, string> = {
 // col1 vacío = solo col2 contribuye
 const AREA_MAP: { field: keyof Pick<CortesRow,
   'en_corte'|'en_bordado'|'en_costura'|'en_estampado'|'en_estampado_ext'|
-  'en_lavanderia'|'en_costura_lineas'|'en_acabado'|'apt'>
+  'en_transfer'|'en_lavanderia'|'en_costura_lineas'|'en_acabado'|'apt'>
   col1: string; col2: string }[] = [
   { field: 'en_corte',          col1: 'POR CORTAR',            col2: 'EN CORTE' },
   { field: 'en_bordado',        col1: 'BORDADO PZA',           col2: 'BORDADO PDA' },
   { field: 'en_costura',        col1: 'ESTANTERIA',            col2: 'COSTURA PROCESO' },
   { field: 'en_estampado',      col1: 'ESTAMPADO PZA CHINCHA', col2: 'ESTAMPADO PDA CHINCHA' },
   { field: 'en_estampado_ext',  col1: 'ESTAMPADO PZA EXT',     col2: 'ESTAMPADO PDA EXT' },
+  { field: 'en_transfer',       col1: 'TRANSFER PZA',          col2: 'TRANSFER PDA' },
   { field: 'en_lavanderia',     col1: '',                      col2: 'LAVANDERIA_PDA' },
   { field: 'en_costura_lineas', col1: '',                      col2: 'COSTURA LINEAS' },
   { field: 'en_acabado',        col1: '',                      col2: 'ACABADO' },
@@ -143,6 +144,7 @@ export function parseCortes(
         en_costura:        areaVals['en_costura'],
         en_estampado:      areaVals['en_estampado'],
         en_estampado_ext:  areaVals['en_estampado_ext'],
+        en_transfer:       areaVals['en_transfer'],
         en_lavanderia:     areaVals['en_lavanderia'],
         en_costura_lineas: areaVals['en_costura_lineas'],
         en_acabado:        areaVals['en_acabado'],

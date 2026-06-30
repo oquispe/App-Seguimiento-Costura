@@ -7,6 +7,7 @@ const PIPELINE = [
   { key: 'costura',        label: 'Costura',         field: 'en_costura' },
   { key: 'estampado',      label: 'Estampado',       field: 'en_estampado' },
   { key: 'estampado_ext',  label: 'Estampado Ext',   field: 'en_estampado_ext' },
+  { key: 'transfer',       label: 'Transfer',        field: 'en_transfer' },
   { key: 'lavanderia',     label: 'Lavandería',      field: 'en_lavanderia' },
   { key: 'costura_lineas', label: 'Costura Líneas',  field: 'en_costura_lineas' },
   { key: 'acabado',        label: 'Acabado',         field: 'en_acabado' },
