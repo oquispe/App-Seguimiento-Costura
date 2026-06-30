@@ -9,6 +9,51 @@ import type {
   LlaveCruce,
 } from '../../types'
 
+/**
+ * Quita el prefijo numérico de código de color.
+ * "0421 - Breaker Blue" → "BREAKER BLUE"
+ * "NAVY BLUE"           → "NAVY BLUE"
+ */
+function stripColorCode(color: string): string {
+  return normalize(color).replace(/^\d{3,4}\s*[-–]\s*/, '').trim()
+}
+
+/**
+ * Busca la mejor fila de Cortes para un PO+Color de Auditorías.
+ * Fuente de verdad: el Status y el PGO tienen el color correcto;
+ * el Excel de Auditorías puede tener variaciones o errores de escritura.
+ *
+ * Prioridad:
+ * 1. PO + Color exacto (normalizado)
+ * 2. PO + Color sin código numérico ("0421 - Breaker Blue" ≈ "Breaker Blue")
+ * 3. PO con un único color en Cortes (no hay ambigüedad)
+ * 4. null → produccion_cerrada
+ */
+function buscarCorte(
+  crucePO: string,
+  auditColor: string,
+  cortesPorPO: Map<string, CortesRow[]>
+): CortesRow | null {
+  const candidatos = cortesPorPO.get(crucePO)
+  if (!candidatos || candidatos.length === 0) return null
+
+  const auditColorNorm   = normalize(auditColor)
+  const auditColorStrip  = stripColorCode(auditColor)
+
+  // 1. Exacto
+  const exacto = candidatos.find(c => normalize(c.color) === auditColorNorm)
+  if (exacto) return exacto
+
+  // 2. Sin código de color
+  const fuzzy = candidatos.find(c => stripColorCode(c.color) === auditColorStrip)
+  if (fuzzy) return fuzzy
+
+  // 3. Único color → no hay riesgo de cruzar datos entre colores distintos
+  if (candidatos.length === 1) return candidatos[0]
+
+  return null
+}
+
 export function cruzarDatos(
   auditorias: AuditoriaRow[],
   pgos: PgoRow[],
@@ -24,13 +69,14 @@ export function cruzarDatos(
     if (!pgoIdx.has(k)) pgoIdx.set(k, p)
   }
 
-  // Índice Cortes: solo por PO+COLOR exacto
-  // No se usa fallback por PO solo para evitar que datos de un color
-  // contaminen a otro color del mismo PO
-  const cortesIdxFull = new Map<string, CortesRow>()
+  // Índice Cortes: PO → lista de CortesRow (todos los colores de ese PO)
+  // Fuente de verdad para el color: el Status tiene el nombre oficial
+  const cortesPorPO = new Map<string, CortesRow[]>()
   for (const c of cortes) {
-    const kFull = `${normalizePO(c.po)}|${normalize(c.color)}`
-    if (!cortesIdxFull.has(kFull)) cortesIdxFull.set(kFull, c)
+    const kPO = normalizePO(c.po)
+    const arr = cortesPorPO.get(kPO) ?? []
+    arr.push(c)
+    cortesPorPO.set(kPO, arr)
   }
 
   const items: ItemCruzado[] = []
@@ -49,13 +95,13 @@ export function cruzarDatos(
       : crucePO
     const pgo = pgoIdx.get(pgoKey) ?? null
 
-    // Cruce Cortes: solo PO+COLOR exacto
-    const corte = cortesIdxFull.get(`${crucePO}|${cruceColor}`) ?? null
+    // Cruce Cortes: búsqueda robusta (exacto → fuzzy → único color del PO)
+    const corte = buscarCorte(crucePO, aud.color, cortesPorPO)
 
     if (pgo) conPgo++
     else sinPgo.add(crucePO)
 
-    // Si el PO no aparece en el reporte, se asume producción 100% cerrada (ya en bodega).
+    // Si no aparece en el reporte → producción cerrada (bodega/APT)
     const produccionCerrada = corte === null
     if (corte) conCortes++
     else cerrados.add(crucePO)
@@ -63,8 +109,8 @@ export function cruzarDatos(
     const totalRequeridas = corte?.total_requeridas ?? (produccionCerrada ? aud.cant_prog ?? 0 : 0)
     const aptFallback     = produccionCerrada ? aud.cant_prog ?? 0 : 0
 
-    const diasFinal = diasRestantes(pgo?.auditoria_final ?? null)
-    const item_key  = makeItemKey(aud.po, aud.color, aud.semana)
+    const diasFinal  = diasRestantes(pgo?.auditoria_final ?? null)
+    const item_key   = makeItemKey(aud.po, aud.color, aud.semana)
 
     items.push({
       item_key,
@@ -76,9 +122,9 @@ export function cruzarDatos(
       cant_prog:   aud.cant_prog,
       externa:     aud.externa,
       // PGO
-      fin_entrega:    pgo?.fin_entrega     ?? null,
-      auditoria:      pgo?.auditoria       ?? null,
-      auditoria_final: pgo?.auditoria_final ?? null,
+      fin_entrega:     pgo?.fin_entrega      ?? null,
+      auditoria:       pgo?.auditoria        ?? null,
+      auditoria_final: pgo?.auditoria_final  ?? null,
       // Posición en producción (de rptReporteSituacionOrdenes)
       op:                  corte?.op                  ?? '',
       ruta:                corte?.ruta                ?? '',
@@ -96,28 +142,26 @@ export function cruzarDatos(
       total_requeridas:    totalRequeridas,
       produccion_cerrada:  produccionCerrada,
       // Semáforo
-      dias_fin_entrega:    diasRestantes(pgo?.fin_entrega ?? null),
+      dias_fin_entrega:     diasRestantes(pgo?.fin_entrega ?? null),
       dias_auditoria_final: diasFinal,
-      semaforo:            calcularSemaforo(diasFinal),
+      semaforo:             calcularSemaforo(diasFinal),
       // Defaults de seguimiento (se sobreescribirán con datos de Supabase)
-      estado:          'Pendiente',
-      resultado:       null,
+      estado:           'Pendiente',
+      resultado:        null,
       fecha_solicitada: null,
       fecha_auditoria:  null,
-      solicitado_por:  null,
-      responsable:     null,
-      compromisos:     {},
+      solicitado_por:   null,
+      responsable:      null,
+      compromisos:      {},
     })
   }
 
-  // Deduplicar por item_key: si Auditorías tiene la misma PO+COLOR+SEMANA duplicada,
-  // quedarse con la última ocurrencia (la que sobreescribiría en la BD de todas formas)
+  // Deduplicar por item_key
   const deduped = new Map<string, ItemCruzado>()
   for (const it of items) deduped.set(it.item_key, it)
-  const itemsUnicos = Array.from(deduped.values())
 
   return {
-    items: itemsUnicos,
+    items: Array.from(deduped.values()),
     diagnostico: {
       total_auditorias: auditorias.length,
       con_pgo:    conPgo,
