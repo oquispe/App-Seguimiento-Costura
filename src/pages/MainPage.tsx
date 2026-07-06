@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { Upload, BarChart3, Users, Download, LogOut, Wand2, Cloud, RefreshCw, MessageCircle, X } from 'lucide-react'
+import { Upload, BarChart3, Users, Download, LogOut, Wand2, Cloud, RefreshCw, MessageCircle, X, ClipboardList } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { publicarCargaActual, leerCargaActual, guardarSnapshot, actualizarStatusCortes, leerUltimaActualizacion } from '../lib/cargaActual'
 import { diasRestantes, calcularSemaforo } from '../lib/parsers/dateUtils'
@@ -18,12 +18,14 @@ import { useSeguimiento } from '../hooks/useSeguimiento'
 import { parseAuditorias } from '../lib/parsers/parseAuditorias'
 import { parsePgo } from '../lib/parsers/parsePgo'
 import { parseCortes } from '../lib/parsers/parseCortes'
-import { exportarExcel } from '../lib/exporters/exportExcel'
+import { exportarExcel, exportarCompromisos } from '../lib/exporters/exportExcel'
+import { extraerCompromisos } from '../lib/compromisos'
+import { TablaCompromisos } from '../components/compromisos/TablaCompromisos'
 import { Spinner } from '../components/ui/Spinner'
 import type { ItemCruzado, AuditoriaRow, PgoRow, CortesRow, ParseResult } from '../types'
 import type { Filtros } from '../components/table/Filtros'
 
-type Tab = 'dashboard' | 'carga' | 'cumplimiento'
+type Tab = 'dashboard' | 'carga' | 'cumplimiento' | 'compromisos'
 
 const EMPTY_FILTROS: Filtros = {
   cliente: '', semana: '', estado: '', responsable: '', semaforo: '',
@@ -39,6 +41,9 @@ export function MainPage() {
   const [loadingSeg, setLoadingSeg] = useState(false)
   const [iaResumen, setIaResumen] = useState<string | null>(null)
   const [iaLoading, setIaLoading] = useState(false)
+  const [iaCompromisos, setIaCompromisos] = useState<string | null>(null)
+  const [iaCompromisosLoading, setIaCompromisosLoading] = useState(false)
+  const [exportandoCompromisos, setExportandoCompromisos] = useState(false)
   const [publicando, setPublicando] = useState(false)
   const [publicadoMsg, setPublicadoMsg] = useState<string | null>(null)
   const [cargandoNube, setCargandoNube] = useState(false)
@@ -81,6 +86,7 @@ export function MainPage() {
 
   const kpis = useMemo(() => calcularKPIs(state.items), [state.items])
   const itemsFiltrados = useMemo(() => aplicarFiltros(state.items, filtros), [state.items, filtros])
+  const compromisosRows = useMemo(() => extraerCompromisos(itemsFiltrados), [itemsFiltrados])
 
   const handleParsedAuditorias = useCallback(
     async (result: ParseResult<AuditoriaRow>) => {
@@ -123,6 +129,24 @@ export function MainPage() {
     mergeSegimiento([updated])
     setSelectedItem(updated)
   }, [mergeSegimiento])
+
+  const handleCerrarAuditoria = useCallback(async (itemKey: string) => {
+    const item = state.items.find((i) => i.item_key === itemKey)
+    const { error } = await supabase
+      .from('seguimiento')
+      .upsert({ item_key: itemKey, estado: 'Aprobada' as const }, { onConflict: 'item_key' })
+    if (error) { console.error('Error cerrando auditoría:', error); return }
+    mergeSegimiento([{ item_key: itemKey, estado: 'Aprobada', compromisos: item?.compromisos ?? {} }])
+  }, [state.items, mergeSegimiento])
+
+  const handleReabrirAuditoria = useCallback(async (itemKey: string) => {
+    const item = state.items.find((i) => i.item_key === itemKey)
+    const { error } = await supabase
+      .from('seguimiento')
+      .upsert({ item_key: itemKey, estado: 'Pendiente' as const }, { onConflict: 'item_key' })
+    if (error) { console.error('Error reabriendo auditoría:', error); return }
+    mergeSegimiento([{ item_key: itemKey, estado: 'Pendiente', compromisos: item?.compromisos ?? {} }])
+  }, [state.items, mergeSegimiento])
 
   const handleExportar = useCallback(async () => {
     // Cargar todos los comentarios de los ítems visibles
@@ -198,6 +222,34 @@ export function MainPage() {
     }
   }, [cortesUpdate, userEmail, setItemsDesdeNube])
 
+  const handleDateChange = useCallback(async (itemKeys: string[], newDate: string) => {
+    const newDateObj = new Date(newDate + 'T12:00:00')
+    const diasFinal = diasRestantes(newDateObj)
+    const newSemaforo = calcularSemaforo(diasFinal)
+
+    const upsertRows = itemKeys.map((key) => {
+      const item = state.items.find((i) => i.item_key === key)
+      return {
+        item_key: key,
+        estado: item?.estado ?? 'Pendiente',
+        auditoria_final_override: newDate,
+      }
+    })
+
+    const { error } = await supabase
+      .from('seguimiento')
+      .upsert(upsertRows, { onConflict: 'item_key' })
+
+    if (error) { console.error('Error guardando fecha:', error); return }
+
+    mergeSegimiento(itemKeys.map((key) => ({
+      item_key: key,
+      auditoria_final_override: newDate,
+      dias_auditoria_final: diasFinal,
+      semaforo: newSemaforo,
+    })))
+  }, [state.items, mergeSegimiento])
+
   const handleResumenIA = useCallback(async () => {
     setIaLoading(true)
     setIaResumen(null)
@@ -214,6 +266,37 @@ export function MainPage() {
       setIaLoading(false)
     }
   }, [state.items, kpis])
+
+  const generarResumenCompromisosTexto = useCallback(async (): Promise<string> => {
+    const res = await fetch('/api/ia/resumen-compromisos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ compromisos: compromisosRows }),
+    })
+    const json = await res.json()
+    return json.resultado ?? json.error ?? ''
+  }, [compromisosRows])
+
+  const handleResumenCompromisos = useCallback(async () => {
+    setIaCompromisosLoading(true)
+    setIaCompromisos(null)
+    try {
+      setIaCompromisos(await generarResumenCompromisosTexto())
+    } finally {
+      setIaCompromisosLoading(false)
+    }
+  }, [generarResumenCompromisosTexto])
+
+  const handleExportarCompromisos = useCallback(async () => {
+    setExportandoCompromisos(true)
+    try {
+      const texto = iaCompromisos ?? await generarResumenCompromisosTexto()
+      if (!iaCompromisos) setIaCompromisos(texto)
+      exportarCompromisos(compromisosRows, texto)
+    } finally {
+      setExportandoCompromisos(false)
+    }
+  }, [iaCompromisos, generarResumenCompromisosTexto, compromisosRows])
 
   return (
     <div className="min-h-screen bg-surface font-sans">
@@ -236,6 +319,7 @@ export function MainPage() {
             <TabBtn icon={<BarChart3 className="w-4 h-4" />} label="Dashboard" active={tab === 'dashboard'} onClick={() => setTab('dashboard')} />
             <TabBtn icon={<Upload className="w-4 h-4" />} label="Cargar Excel" active={tab === 'carga'} onClick={() => setTab('carga')} />
             <TabBtn icon={<Users className="w-4 h-4" />} label="Por persona" active={tab === 'cumplimiento'} onClick={() => setTab('cumplimiento')} />
+            <TabBtn icon={<ClipboardList className="w-4 h-4" />} label="Compromisos" active={tab === 'compromisos'} onClick={() => setTab('compromisos')} />
           </nav>
           <div className="flex items-center gap-2">
             {fechaActualizacion && (
@@ -438,6 +522,9 @@ export function MainPage() {
               items={itemsFiltrados}
               onSelectItem={setSelectedItem}
               agruparPor={agruparPor}
+              onDateChange={handleDateChange}
+              onCerrarAuditoria={handleCerrarAuditoria}
+              onReabrirAuditoria={handleReabrirAuditoria}
             />
           </div>
         )}
@@ -447,6 +534,46 @@ export function MainPage() {
           <div className="space-y-5">
             <h2 className="text-base font-semibold text-ink">Cumplimiento por responsable</h2>
             <CumplimientoPorPersona personas={kpis.por_persona} />
+          </div>
+        )}
+
+        {/* ── TAB: COMPROMISOS ── */}
+        {tab === 'compromisos' && (
+          <div className="space-y-5">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <h2 className="text-base font-semibold text-ink">Compromisos para seguimiento</h2>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleResumenCompromisos}
+                  disabled={iaCompromisosLoading || compromisosRows.length === 0}
+                  className="flex items-center gap-2 border border-violet-500 text-violet-600 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-violet-50 disabled:opacity-40 transition-colors"
+                >
+                  {iaCompromisosLoading ? <Spinner size="sm" /> : <ClipboardList className="w-4 h-4" />}
+                  Resumen IA
+                </button>
+                <button
+                  onClick={handleExportarCompromisos}
+                  disabled={exportandoCompromisos || compromisosRows.length === 0}
+                  title="Genera (si falta) el resumen IA y lo incluye en el Excel, junto al detalle"
+                  className="flex items-center gap-2 border border-line text-ink-muted px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-surface disabled:opacity-40 transition-colors"
+                >
+                  {exportandoCompromisos ? <Spinner size="sm" /> : <Download className="w-4 h-4" />}
+                  Descargar Excel
+                </button>
+              </div>
+            </div>
+
+            {iaCompromisos && (
+              <div className="bg-violet-50 border border-violet-200 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold text-violet-700">Resumen de compromisos (IA)</span>
+                  <button onClick={() => setIaCompromisos(null)} className="text-xs text-ink-muted">✕</button>
+                </div>
+                <p className="text-sm text-ink">{iaCompromisos}</p>
+              </div>
+            )}
+
+            <TablaCompromisos rows={compromisosRows} />
           </div>
         )}
       </main>

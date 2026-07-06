@@ -1,4 +1,4 @@
-import { normalizePO, normalize, makeItemKey } from './normalize'
+import { normalizePO, normalize, makeItemKey, stripColorCode } from './normalize'
 import { diasRestantes, calcularSemaforo } from './dateUtils'
 import type {
   AuditoriaRow,
@@ -10,50 +10,39 @@ import type {
 } from '../../types'
 
 /**
- * Normaliza el color para matching flexible:
- * 1. "NAVY - NAVY"         → "NAVY"          (duplicado separado por guión)
- * 2. "0421 - Breaker Blue" → "BREAKER BLUE"  (código numérico al inicio)
- * 3. "NAVY BLUE"           → "NAVY BLUE"     (sin cambio)
- */
-function stripColorCode(color: string): string {
-  const norm = normalize(color)
-  const parts = norm.split(/\s*[-–]\s*/)
-  if (parts.length !== 2) return norm
-
-  const left  = parts[0].trim()
-  const right = parts[1].trim()
-
-  // Caso 1: "X - X" (mismo texto a ambos lados) → "X"
-  if (left === right) return left
-
-  // Caso 2: código numérico al inicio "0421 - Breaker Blue" → "BREAKER BLUE"
-  if (/^\d{3,5}$/.test(left)) return right
-
-  // Caso 3: código alfa-corto sin espacios "MRPNK - MELROSE PINK" → "MELROSE PINK"
-  // El código (izq) no tiene espacios, ≤8 chars y es más corto que el nombre (der)
-  if (!left.includes(' ') && left.length <= 8 && right.length > left.length) return right
-
-  return norm
-}
-
-/**
- * Busca la mejor fila de Cortes para un PO+Color de Auditorías.
+ * Busca la mejor fila de Cortes para un PO+Estilo+Color de Auditorías.
  * Fuente de verdad: el Status y el PGO tienen el color correcto;
  * el Excel de Auditorías puede tener variaciones o errores de escritura.
  *
+ * Un mismo PO puede repartirse entre muchos estilos distintos que además
+ * comparten color (ej. PO 1691497 tiene 4 estilos distintos en "NAVY", cada
+ * uno en una etapa de producción diferente). Por eso primero se acota por
+ * estilo y recién ahí se busca el color — si no, se puede mezclar el avance
+ * de un estilo con el de otro sin relación.
+ *
  * Prioridad:
- * 1. PO + Color exacto (normalizado)
- * 2. PO + Color sin código numérico ("0421 - Breaker Blue" ≈ "Breaker Blue")
- * 3. PO con un único color en Cortes (no hay ambigüedad)
+ * 1. PO + Estilo + Color exacto (normalizado)
+ * 2. PO + Estilo + Color sin código numérico ("0421 - Breaker Blue" ≈ "Breaker Blue")
+ * 3. PO + Estilo con un único color en Cortes (no hay ambigüedad)
  * 4. null → produccion_cerrada
  */
 function buscarCorte(
   crucePO: string,
   auditColor: string,
+  auditEstilo: string,
   cortesPorPO: Map<string, CortesRow[]>
 ): CortesRow | null {
-  const candidatos = cortesPorPO.get(crucePO)
-  if (!candidatos || candidatos.length === 0) return null
+  const todos = cortesPorPO.get(crucePO)
+  if (!todos || todos.length === 0) return null
+
+  // Si el Status trae estilo y hay más de un estilo bajo este PO, acotar
+  // los candidatos al estilo correcto antes de buscar por color.
+  const auditEstiloNorm = normalize(auditEstilo)
+  const hayVariosEstilos = new Set(todos.map(c => normalize(c.estilo))).size > 1
+  const porEstilo = hayVariosEstilos && auditEstiloNorm
+    ? todos.filter(c => normalize(c.estilo) === auditEstiloNorm)
+    : []
+  const candidatos = porEstilo.length > 0 ? porEstilo : todos
 
   const auditColorNorm   = normalize(auditColor)
   const auditColorStrip  = stripColorCode(auditColor)
@@ -133,8 +122,8 @@ export function cruzarDatos(
       : crucePO
     const pgo = pgoIdx.get(pgoKey) ?? null
 
-    // Cruce Cortes: búsqueda robusta (exacto → fuzzy → único color del PO)
-    const corte = buscarCorte(crucePO, aud.color, cortesPorPO)
+    // Cruce Cortes: búsqueda robusta (exacto → fuzzy → único color del PO+estilo)
+    const corte = buscarCorte(crucePO, aud.color, aud.estilo, cortesPorPO)
 
     if (pgo) conPgo++
     else sinPgo.add(crucePO)
@@ -148,7 +137,7 @@ export function cruzarDatos(
     const aptFallback     = 0
 
     const diasFinal  = diasRestantes(pgo?.auditoria_final ?? null)
-    const item_key   = makeItemKey(aud.po, aud.color, aud.semana)
+    const item_key   = makeItemKey(aud.po, aud.estilo, aud.color, aud.semana)
 
     items.push({
       item_key,
@@ -180,6 +169,7 @@ export function cruzarDatos(
       porc_exp:            corte?.porc_exp            ?? 0,
       total_requeridas:    totalRequeridas,
       produccion_cerrada:  produccionCerrada,
+      ops:                 corte?.ops ?? [],
       // Semáforo
       dias_fin_entrega:     diasRestantes(pgo?.fin_entrega ?? null),
       dias_auditoria_final: diasFinal,
@@ -191,7 +181,8 @@ export function cruzarDatos(
       fecha_auditoria:  null,
       solicitado_por:   null,
       responsable:      null,
-      compromisos:      {},
+      compromisos:                {},
+      auditoria_final_override:  null,
     })
   }
 

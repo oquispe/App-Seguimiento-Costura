@@ -30,6 +30,7 @@ export function useSeguimiento() {
       solicitado_por:  item.solicitado_por,
       responsable:     item.responsable,
       compromisos:     item.compromisos ?? null,
+      auditoria_final_override: item.auditoria_final_override ?? null,
     }
     const { error } = await supabase
       .from('seguimiento')

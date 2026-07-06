@@ -1,4 +1,4 @@
-import type { ItemCruzado } from '../types'
+import type { ItemCruzado, OpDetalle } from '../types'
 
 // Pipeline de áreas en orden de producción
 const PIPELINE = [
@@ -41,16 +41,34 @@ export function estaListoParaAuditar(item: ItemCruzado): boolean {
   return total > 0 && item.apt >= total
 }
 
-/** Retorna las áreas donde hay prendas ahora mismo, en orden del pipeline. */
-export function ubicacionActual(item: ItemCruzado): UbicacionEtapa[] {
+type CamposPipeline = Pick<ItemCruzado,
+  'en_corte' | 'en_bordado' | 'en_costura' | 'en_estampado' | 'en_estampado_ext' |
+  'en_transfer' | 'en_lavanderia' | 'en_costura_lineas' | 'en_acabado' | 'apt'>
+
+function ubicacionDeCampos(campos: CamposPipeline): UbicacionEtapa[] {
   return PIPELINE
     .map(({ key, label, field }) => ({
       key,
       label,
-      cantidad: (item[field as keyof ItemCruzado] as number) ?? 0,
+      cantidad: campos[field as keyof CamposPipeline] ?? 0,
       ok: false,
     }))
     .filter((u) => u.cantidad > 0)
+}
+
+/** Retorna las áreas donde hay prendas ahora mismo, en orden del pipeline. */
+export function ubicacionActual(item: ItemCruzado): UbicacionEtapa[] {
+  return ubicacionDeCampos(item)
+}
+
+/** Igual que ubicacionActual pero para una OP individual dentro del ítem. */
+export function ubicacionActualOp(op: OpDetalle): UbicacionEtapa[] {
+  return ubicacionDeCampos(op)
+}
+
+/** true cuando una OP individual ya tiene todas sus prendas en APT. */
+export function opListo(op: OpDetalle): boolean {
+  return op.total_requeridas > 0 && op.apt >= op.total_requeridas
 }
 
 /**

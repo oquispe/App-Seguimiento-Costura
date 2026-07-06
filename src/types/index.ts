@@ -24,6 +24,7 @@ export interface CortesRow {
   po: string
   op: string
   cliente: string
+  estilo: string
   color: string
   ruta: string
   // Prendas en cada área = Columna01 + Columna02 (según Hoja2 del reporte)
@@ -40,6 +41,27 @@ export interface CortesRow {
   exportado: number         // Exportado
   porc_exp: number          // Porc Exp (% exportado)
   total_requeridas: number  // Requerida
+  // Desglose por OP individual: un mismo PO+Estilo+Color puede repartirse
+  // entre varias OPs, cada una en una etapa de producción distinta.
+  ops: OpDetalle[]
+}
+
+/** Avance de una OP individual dentro de un PO+Estilo+Color. */
+export interface OpDetalle {
+  op: string
+  ruta: string
+  en_corte: number
+  en_bordado: number
+  en_costura: number
+  en_estampado: number
+  en_estampado_ext: number
+  en_transfer: number
+  en_lavanderia: number
+  en_costura_lineas: number
+  en_acabado: number
+  apt: number
+  exportado: number
+  total_requeridas: number
 }
 
 // ─── Ítem cruzado principal ────────────────────────────────────────────────────
@@ -76,6 +98,8 @@ export interface ItemCruzado {
   total_requeridas: number
   // true si el PO no aparece en el reporte → producción 100% cerrada (ya en bodega)
   produccion_cerrada: boolean
+  // Desglose por OP individual (ver CortesRow.ops)
+  ops: OpDetalle[]
   // Semáforo
   dias_fin_entrega: number | null
   dias_auditoria_final: number | null
@@ -88,6 +112,7 @@ export interface ItemCruzado {
   solicitado_por: string | null
   responsable: string | null
   compromisos: CompromisosEtapas
+  auditoria_final_override: string | null
 }
 
 export type EstadoAuditoria =
@@ -127,6 +152,7 @@ export interface SeguimientoRecord {
   solicitado_por: string | null
   responsable: string | null
   compromisos: CompromisosEtapas | null
+  auditoria_final_override: string | null
 }
 
 export interface ComentarioRecord {

@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { X, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { X, AlertTriangle, CheckCircle2, Trash2 } from 'lucide-react'
 import { Badge } from '../ui/Badge'
 import { Spinner } from '../ui/Spinner'
 import { SemaforoDot } from '../ui/Semaforo'
 import { useSeguimiento } from '../../hooks/useSeguimiento'
-import { ubicacionActual, estaListoParaAuditar, totalOrden } from '../../lib/posicion'
-import type { ItemCruzado, CompromisoEtapa, CompromisosEtapas } from '../../types'
+import { ubicacionActual, ubicacionActualOp, opListo, estaListoParaAuditar, totalOrden } from '../../lib/posicion'
+import { getErrorMessage } from '../../lib/errorUtils'
+import type { ItemCruzado, OpDetalle, CompromisoEtapa, CompromisosEtapas } from '../../types'
 
 interface Props {
   item: ItemCruzado | null
@@ -69,6 +70,40 @@ function RutaProgreso({ item }: { item: ItemCruzado }) {
   )
 }
 
+// ─── OPs individuales (un PO+Estilo+Color puede repartirse en varias OPs) ────
+
+function OpsSection({ ops }: { ops: OpDetalle[] }) {
+  if (ops.length <= 1) return null
+
+  return (
+    <section className="p-4 border-b border-line">
+      <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">
+        OPs de esta orden ({ops.length})
+      </h3>
+      <div className="space-y-2">
+        {ops.map((op) => {
+          const listo = opListo(op)
+          const ubicacion = ubicacionActualOp(op)
+          return (
+            <div key={op.op} className="flex flex-wrap items-center gap-1.5 border border-line rounded-lg px-2.5 py-1.5">
+              <span className="text-xs font-mono font-semibold text-ink shrink-0">OP {op.op || '—'}</span>
+              {listo ? (
+                <Badge variant="verde">Listo · APT {op.apt}</Badge>
+              ) : ubicacion.length > 0 ? (
+                ubicacion.map((u) => (
+                  <Badge key={u.key} variant="ambar">{u.label} {u.cantidad}</Badge>
+                ))
+              ) : (
+                <Badge variant="sin-fecha">Sin datos</Badge>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
 // ─── Compromisos por área ─────────────────────────────────────────────────────
 
 const COMPROMISO_VACIO: CompromisoEtapa = {
@@ -102,6 +137,11 @@ function CompromisosSection({
     })
   }
 
+  const quitarComp = (key: string) => {
+    const { [key]: _omit, ...resto } = compromisos
+    onChange(resto)
+  }
+
   return (
     <div className="space-y-3">
       {ubicacion.map((u) => {
@@ -118,12 +158,24 @@ function CompromisosSection({
                 <span className="text-sm font-semibold text-ink">{u.label}</span>
                 <Badge variant="ambar">{u.cantidad}</Badge>
               </div>
-              {vencido && (
-                <div className="flex items-center gap-1 text-red-600">
-                  <AlertTriangle className="w-4 h-4" />
-                  <span className="text-xs font-medium">Vencida</span>
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                {vencido && (
+                  <div className="flex items-center gap-1 text-red-600">
+                    <AlertTriangle className="w-4 h-4" />
+                    <span className="text-xs font-medium">Vencida</span>
+                  </div>
+                )}
+                {compromisos[u.key] && (
+                  <button
+                    type="button"
+                    onClick={() => quitarComp(u.key)}
+                    title="Quitar este compromiso"
+                    className="p-1 rounded hover:bg-red-50 text-ink-muted hover:text-red-600 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-[140px_1fr] gap-2">
@@ -168,13 +220,22 @@ export function DrawerDetalle({ item, onClose, onUpdated }: Props) {
     setCompromisos(item.compromisos ?? {})
   }, [item])
 
+  const [guardadoOk, setGuardadoOk] = useState(false)
+  const [guardadoError, setGuardadoError] = useState<string | null>(null)
+
   const handleGuardar = useCallback(async () => {
     if (!item) return
     setSaving(true)
+    setGuardadoOk(false)
+    setGuardadoError(null)
     try {
       const updated: ItemCruzado = { ...item, compromisos }
       await guardarSeguimiento(updated)
       onUpdated(updated)
+      setGuardadoOk(true)
+      setTimeout(() => setGuardadoOk(false), 4000)
+    } catch (err) {
+      setGuardadoError(getErrorMessage(err))
     } finally {
       setSaving(false)
     }
@@ -197,6 +258,32 @@ export function DrawerDetalle({ item, onClose, onUpdated }: Props) {
             <X className="w-5 h-5 text-ink-muted" />
           </button>
         </div>
+
+        {/* Banner "Guardado" */}
+        {guardadoOk && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 border-b border-emerald-200">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span className="text-sm font-medium text-emerald-700">
+              ✓ Datos guardados — las fechas ya se ven en la tabla
+            </span>
+          </div>
+        )}
+        {/* Banner de error */}
+        {guardadoError && (
+          <div className="flex items-start gap-2 px-4 py-2 bg-red-50 border-b border-red-200">
+            <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-red-700">Error al guardar</p>
+              <p className="text-xs text-red-600 mt-0.5 font-mono break-all">{guardadoError}</p>
+              {guardadoError.includes('auditoria_final_override') && (
+                <p className="text-xs text-red-700 mt-1 font-medium">
+                  Falta correr la migración SQL en Supabase:
+                  <code className="ml-1 bg-red-100 rounded px-1">ALTER TABLE seguimiento ADD COLUMN IF NOT EXISTS auditoria_final_override DATE;</code>
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto">
           {/* Datos PGO */}
@@ -230,13 +317,15 @@ export function DrawerDetalle({ item, onClose, onUpdated }: Props) {
                 {item.ruta}
               </p>
             )}
-            {item.op && (
+            {item.op && item.ops.length <= 1 && (
               <p className="text-xs text-ink-muted mb-3">
                 OP: <span className="text-ink font-medium font-mono">{item.op}</span>
               </p>
             )}
             <RutaProgreso item={item} />
           </section>
+
+          <OpsSection ops={item.ops ?? []} />
 
           {/* Compromisos por área */}
           <section className="p-4">
@@ -251,10 +340,14 @@ export function DrawerDetalle({ item, onClose, onUpdated }: Props) {
             <button
               onClick={handleGuardar}
               disabled={saving}
-              className="mt-4 w-full bg-brand-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-brand-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className={`mt-4 w-full py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2 ${
+                guardadoOk
+                  ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                  : 'bg-brand-600 text-white hover:bg-brand-700'
+              }`}
             >
               {saving && <Spinner size="sm" />}
-              Guardar compromisos
+              {guardadoOk ? '✓ Guardado — ya se ve en la tabla' : 'Guardar compromisos'}
             </button>
           </section>
         </div>

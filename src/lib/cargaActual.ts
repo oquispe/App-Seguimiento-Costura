@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { normalize, normalizePO } from './parsers/normalize'
+import { normalize, normalizePO, stripColorCode } from './parsers/normalize'
 import type { ItemCruzado, CortesRow } from '../types'
 
 /**
@@ -56,6 +56,7 @@ export async function publicarCargaActual(
     exportado:           it.exportado,
     porc_exp:            it.porc_exp,
     total_requeridas:    it.total_requeridas,
+    ops:                 it.ops ?? [],
     vigente:     true,
     cargado_por: cargadoPor,
     cargado_at:  ahora,
@@ -140,6 +141,7 @@ export async function leerCargaActual(): Promise<ItemCruzado[]> {
       exportado:           Number(row.exportado           ?? 0),
       porc_exp:            Number(row.porc_exp            ?? 0),
       total_requeridas:    Number(row.total_requeridas    ?? 0),
+      ops:                 (row.ops ?? []) as ItemCruzado['ops'],
       // Semáforo se recalcula en cliente
       dias_fin_entrega:    null,
       dias_auditoria_final: null,
@@ -151,7 +153,8 @@ export async function leerCargaActual(): Promise<ItemCruzado[]> {
       fecha_auditoria: (seg?.fecha_auditoria  ?? null) as string | null,
       solicitado_por:  (seg?.solicitado_por   ?? null) as string | null,
       responsable:     (seg?.responsable      ?? null) as string | null,
-      compromisos:     ((seg?.compromisos ?? {}) as ItemCruzado['compromisos']),
+      compromisos:                ((seg?.compromisos ?? {}) as ItemCruzado['compromisos']),
+      auditoria_final_override:  (seg?.auditoria_final_override ?? null) as string | null,
     } as ItemCruzado
   })
 }
@@ -168,31 +171,64 @@ export async function actualizarStatusCortes(
 ): Promise<{ ok: boolean; actualizados: number; error?: string }> {
   if (cortesRows.length === 0) return { ok: false, actualizados: 0, error: 'Sin filas de cortes' }
 
-  // Leer item_key + po + color de los ítems vigentes (mínimo de datos)
+  // Leer item_key + po + estilo + color de los ítems vigentes (mínimo de datos)
   const { data: vigentes, error: e1 } = await supabase
     .from('carga_actual')
-    .select('item_key, po, color')
+    .select('item_key, po, estilo, color')
     .eq('vigente', true)
 
   if (e1) return { ok: false, actualizados: 0, error: e1.message }
   if (!vigentes || vigentes.length === 0)
     return { ok: false, actualizados: 0, error: 'No hay ítems publicados vigentes' }
 
-  // Mapa po|color → item_key[] (un mismo PO+color puede estar en varias semanas)
-  const keyMap = new Map<string, string[]>()
-  for (const v of vigentes as { item_key: string; po: string; color: string }[]) {
-    const k = `${normalizePO(v.po)}|${normalize(v.color)}`
-    const arr = keyMap.get(k) ?? []
-    arr.push(v.item_key)
-    keyMap.set(k, arr)
+  // Un mismo PO+color puede repartirse entre varios estilos distintos, cada
+  // uno en una etapa de producción diferente (ej. PO 1691497 con 4 estilos en
+  // "NAVY"). Además, el color guardado en carga_actual viene de Auditorías
+  // (ej. "NAVY - NAVY") mientras que el del Status trae el formato oficial
+  // (ej. "NAVY") — sin el mismo matching fuzzy que usa buscarCorte() en
+  // cruzar.ts, esa diferencia de formato hace que el ítem nunca calce y se
+  // quede con datos viejos para siempre en cada "Actualizar Cortes".
+  type Vigente = { item_key: string; po: string; estilo: string | null; color: string }
+  const porPO = new Map<string, Vigente[]>()
+  for (const v of vigentes as Vigente[]) {
+    const kPO = normalizePO(v.po)
+    const arr = porPO.get(kPO) ?? []
+    arr.push(v)
+    porPO.set(kPO, arr)
+  }
+
+  // Misma prioridad que buscarCorte(): exacto → color sin código (fuzzy) →
+  // único ítem vigente bajo ese PO+estilo (sin ambigüedad).
+  function buscarVigentes(cr: CortesRow): string[] | undefined {
+    const candidatosPO = porPO.get(normalizePO(cr.po))
+    if (!candidatosPO || candidatosPO.length === 0) return undefined
+
+    const crEstiloNorm = normalize(cr.estilo)
+    const hayVariosEstilos = new Set(candidatosPO.map(v => normalize(v.estilo ?? ''))).size > 1
+    const porEstilo = hayVariosEstilos && crEstiloNorm
+      ? candidatosPO.filter(v => normalize(v.estilo ?? '') === crEstiloNorm)
+      : []
+    const candidatos = porEstilo.length > 0 ? porEstilo : candidatosPO
+
+    const crColorNorm  = normalize(cr.color)
+    const crColorStrip = stripColorCode(cr.color)
+
+    const exacto = candidatos.filter(v => normalize(v.color) === crColorNorm)
+    if (exacto.length > 0) return exacto.map(v => v.item_key)
+
+    const fuzzy = candidatos.filter(v => stripColorCode(v.color) === crColorStrip)
+    if (fuzzy.length > 0) return fuzzy.map(v => v.item_key)
+
+    if (candidatos.length === 1) return [candidatos[0].item_key]
+
+    return undefined
   }
 
   const ahora = new Date().toISOString()
   const updateRows: Record<string, unknown>[] = []
 
   for (const cr of cortesRows) {
-    const k = `${normalizePO(cr.po)}|${normalize(cr.color)}`
-    const itemKeys = keyMap.get(k)
+    const itemKeys = buscarVigentes(cr)
     if (!itemKeys) continue
 
     for (const item_key of itemKeys) {
@@ -213,6 +249,7 @@ export async function actualizarStatusCortes(
         exportado:           cr.exportado,
         porc_exp:            cr.porc_exp,
         total_requeridas:    cr.total_requeridas,
+        ops:                 cr.ops ?? [],
         cargado_por:         cargadoPor,
         cargado_at:          ahora,
       })

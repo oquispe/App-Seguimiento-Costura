@@ -1,6 +1,7 @@
 import { useRef, useState, useCallback } from 'react'
 import { Upload, CheckCircle, AlertTriangle, XCircle } from 'lucide-react'
 import type { ParseResult } from '../../types'
+import { getErrorMessage } from '../../lib/errorUtils'
 
 interface DropZoneProps<T> {
   label: string
@@ -22,7 +23,7 @@ export function DropZone<T>({ label, accept = '.xlsx,.xlsm,.xls', onParsed, pars
         const res = parse(buf)
         onParsed(res, buf)
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err)
+        const msg = getErrorMessage(err)
         onParsed({ rows: [], leidas: 0, validas: 0, omitidas: 0, errores: [`Error al leer el archivo: ${msg}`], columnasFaltantes: [] }, new ArrayBuffer(0))
       }
     },

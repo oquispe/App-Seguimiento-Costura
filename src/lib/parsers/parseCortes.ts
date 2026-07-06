@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx'
 import { normalize, normalizePO } from './normalize'
-import type { CortesRow, ParseResult } from '../../types'
+import type { CortesRow, OpDetalle, ParseResult } from '../../types'
 
 function toNum(v: unknown): number {
   if (v === null || v === undefined || v === '') return 0
@@ -13,6 +13,7 @@ const ID_ALIAS: Record<string, string> = {
   'PO':             'po',
   'OP':             'op',
   'CLIENTE':        'cliente',
+  'ESTILO CLIENTE': 'estilo',
   'COLOR CLIENTE':  'color',
   'RUTA_GENERAL':   'ruta',
   'RUTA GENERAL':   'ruta',
@@ -99,6 +100,9 @@ export function parseCortes(
 
   // Acumular por PO+COLOR (datos empiezan después del header detectado)
   const acum = new Map<string, CortesRow>()
+  // Desglose paralelo por OP individual dentro de cada PO+Estilo+Color: una
+  // misma combinación puede repartirse entre varias OPs en etapas distintas.
+  const opsAcum = new Map<string, Map<string, OpDetalle>>()
 
   for (let r = headerRowIdx + 1; r < data.length; r++) {
     const row = data[r] ?? []
@@ -110,13 +114,17 @@ export function parseCortes(
 
     const op      = String(row[colIdx['op']] ?? '').trim()
     const cliente = 'cliente' in colIdx ? String(row[colIdx['cliente']] ?? '').trim() : ''
+    const estilo  = 'estilo' in colIdx  ? String(row[colIdx['estilo']] ?? '').trim() : ''
     const color   = 'color' in colIdx   ? String(row[colIdx['color']] ?? '').trim() : ''
     const ruta    = 'ruta' in colIdx    ? String(row[colIdx['ruta']] ?? '').trim() : ''
     const totReq  = 'total_requeridas' in colIdx ? toNum(row[colIdx['total_requeridas']]) : 0
     const expQty  = 'exportado' in colIdx ? toNum(row[colIdx['exportado']]) : 0
     const expPct  = 'porc_exp'  in colIdx ? toNum(row[colIdx['porc_exp']])  : 0
 
-    const key = `${po}|${normalize(color)}`
+    // Un mismo PO puede repartirse entre muchos estilos distintos que además
+    // comparten color (ej. PO con 20 estilos, varios en "NAVY"). Si no se suma
+    // por estilo, se mezcla el avance de un estilo con el de otro sin relación.
+    const key = `${po}|${normalize(estilo)}|${normalize(color)}`
     const existing = acum.get(key)
 
     const areaVals: Record<string, number> = {}
@@ -137,6 +145,7 @@ export function parseCortes(
         po,
         op,
         cliente,
+        estilo,
         color,
         ruta,
         en_corte:          areaVals['en_corte'],
@@ -152,10 +161,42 @@ export function parseCortes(
         exportado:         expQty,
         porc_exp:          expPct,
         total_requeridas:  totReq,
+        ops:               [],
+      })
+    }
+
+    // Acumular también por OP individual (una OP puede tener varias filas, ej. por talla)
+    if (!opsAcum.has(key)) opsAcum.set(key, new Map())
+    const opsMap = opsAcum.get(key)!
+    const opExisting = opsMap.get(op)
+    if (opExisting) {
+      for (const area of AREA_MAP) opExisting[area.field] += areaVals[area.field]
+      opExisting.exportado += expQty
+      if (totReq > opExisting.total_requeridas) opExisting.total_requeridas = totReq
+      if (!opExisting.ruta && ruta) opExisting.ruta = ruta
+    } else {
+      opsMap.set(op, {
+        op,
+        ruta,
+        en_corte:          areaVals['en_corte'],
+        en_bordado:        areaVals['en_bordado'],
+        en_costura:        areaVals['en_costura'],
+        en_estampado:      areaVals['en_estampado'],
+        en_estampado_ext:  areaVals['en_estampado_ext'],
+        en_transfer:       areaVals['en_transfer'],
+        en_lavanderia:     areaVals['en_lavanderia'],
+        en_costura_lineas: areaVals['en_costura_lineas'],
+        en_acabado:        areaVals['en_acabado'],
+        apt:               areaVals['apt'],
+        exportado:         expQty,
+        total_requeridas:  totReq,
       })
     }
   }
 
-  const rows = Array.from(acum.values())
+  const rows = Array.from(acum.entries()).map(([key, row]) => ({
+    ...row,
+    ops: Array.from(opsAcum.get(key)?.values() ?? []),
+  }))
   return { rows, leidas, validas: rows.length, omitidas, errores, columnasFaltantes }
 }

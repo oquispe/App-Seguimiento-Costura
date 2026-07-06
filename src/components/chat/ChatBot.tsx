@@ -4,6 +4,7 @@ import { Spinner } from '../ui/Spinner'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { ubicacionActual } from '../../lib/posicion'
+import { getErrorMessage } from '../../lib/errorUtils'
 import type { ItemCruzado } from '../../types'
 
 interface Mensaje {
@@ -210,7 +211,7 @@ export function ChatBot({ items, isOpen, onClose }: Props) {
       setMensajes((prev) => [...prev, {
         id: nextId++,
         rol: 'assistant',
-        texto: `Error: ${err instanceof Error ? err.message : String(err)}`,
+        texto: `Error: ${getErrorMessage(err)}`,
         ts: new Date(),
       }])
     } finally {

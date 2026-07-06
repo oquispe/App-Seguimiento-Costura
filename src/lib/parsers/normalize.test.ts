@@ -26,7 +26,12 @@ describe('normalizePO', () => {
 
 describe('makeItemKey', () => {
   it('genera clave compuesta sin tildes', () => {
-    const key = makeItemKey('PO-001', 'Rojo', 'Semana 23')
-    expect(key).toBe('PO-001|ROJO|SEMANA 23')
+    const key = makeItemKey('PO-001', 'Est1', 'Rojo', 'Semana 23')
+    expect(key).toBe('PO-001|EST1|ROJO|SEMANA 23')
+  })
+  it('distingue estilos diferentes con mismo PO+color+semana', () => {
+    const key1 = makeItemKey('1684302', '30488', 'NAVY - NAVY', 'Proyeccion Sem 28')
+    const key2 = makeItemKey('1684302', '33300', 'NAVY - NAVY', 'Proyeccion Sem 28')
+    expect(key1).not.toBe(key2)
   })
 })

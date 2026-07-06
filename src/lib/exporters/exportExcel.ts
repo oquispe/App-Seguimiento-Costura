@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { ItemCruzado, ComentarioRecord } from '../../types'
+import type { CompromisoRow } from '../compromisos'
 
 function fmtDate(d: Date | null | undefined): string {
   if (!d) return ''
@@ -60,4 +61,92 @@ export function exportarExcel(
 
   const fecha = format(new Date(), 'yyyyMMdd_HHmm')
   XLSX.writeFile(wb, `Auditorias_Seguimiento_${fecha}.xlsx`)
+}
+
+function fmtFecha(s: string | null): string {
+  if (!s) return ''
+  try {
+    return format(new Date(s + 'T12:00:00'), 'dd/MM/yyyy', { locale: es })
+  } catch {
+    return ''
+  }
+}
+
+/** Envuelve un texto largo en líneas de ~100 caracteres para que quepan en una celda de Excel */
+function envolverTexto(texto: string, ancho = 100): string[] {
+  const palabras = texto.split(/\s+/)
+  const lineas: string[] = []
+  let actual = ''
+  for (const palabra of palabras) {
+    if ((actual + ' ' + palabra).trim().length > ancho) {
+      if (actual) lineas.push(actual.trim())
+      actual = palabra
+    } else {
+      actual = `${actual} ${palabra}`.trim()
+    }
+  }
+  if (actual) lineas.push(actual.trim())
+  return lineas
+}
+
+export function exportarCompromisos(rows: CompromisoRow[], resumenIA?: string | null): void {
+  const wb = XLSX.utils.book_new()
+
+  // ── Hoja 1: Resumen ejecutivo ──────────────────────────────────────────
+  const total = rows.length
+  const vencidos = rows.filter((r) => r.vencido).length
+  const vigentes = total - vencidos
+  const fechaGeneracion = format(new Date(), "dd/MM/yyyy HH:mm", { locale: es })
+
+  const resumenAoa: (string | number)[][] = [
+    ['Resumen de Compromisos para Seguimiento'],
+    [`Generado: ${fechaGeneracion}`],
+    [],
+    ['Total compromisos', total],
+    ['Vencidos', vencidos],
+    ['Vigentes', vigentes],
+    [],
+  ]
+  if (resumenIA) {
+    resumenAoa.push(['Resumen IA'])
+    for (const linea of envolverTexto(resumenIA)) resumenAoa.push([linea])
+  }
+
+  const wsResumen = XLSX.utils.aoa_to_sheet(resumenAoa)
+  wsResumen['!cols'] = [{ wch: 100 }]
+  XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen')
+
+  // ── Hoja 2: Detalle de compromisos ─────────────────────────────────────
+  const wsData = rows.map((r) => ({
+    'Cliente': r.cliente,
+    'Estilo': r.estilo,
+    'PO': r.po,
+    'Color': r.color,
+    'Semana': r.semana,
+    'Área': r.areaLabel,
+    'Comprometidos': r.comprometidos ?? '',
+    'Fecha Compromiso': fmtFecha(r.fecha_compromiso),
+    'Próxima Reunión': fmtFecha(r.proxima_reunion),
+    'Estado': r.vencido ? 'Vencido' : 'Vigente',
+    'Notas': r.notas ?? '',
+  }))
+
+  const ws = XLSX.utils.json_to_sheet(wsData)
+  ws['!cols'] = [
+    { wch: 22 }, // Cliente
+    { wch: 14 }, // Estilo
+    { wch: 14 }, // PO
+    { wch: 18 }, // Color
+    { wch: 10 }, // Semana
+    { wch: 16 }, // Área
+    { wch: 14 }, // Comprometidos
+    { wch: 16 }, // Fecha Compromiso
+    { wch: 16 }, // Próxima Reunión
+    { wch: 10 }, // Estado
+    { wch: 40 }, // Notas
+  ]
+  XLSX.utils.book_append_sheet(wb, ws, 'Compromisos')
+
+  const fecha = format(new Date(), 'yyyyMMdd_HHmm')
+  XLSX.writeFile(wb, `Compromisos_Seguimiento_${fecha}.xlsx`)
 }
