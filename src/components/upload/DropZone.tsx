@@ -6,7 +6,7 @@ import { getErrorMessage } from '../../lib/errorUtils'
 interface DropZoneProps<T> {
   label: string
   accept?: string
-  onParsed: (result: ParseResult<T>, buffer: ArrayBuffer) => void
+  onParsed: (result: ParseResult<T>, buffer: ArrayBuffer, fileName: string) => void
   parse: (buffer: ArrayBuffer) => ParseResult<T>
   result: ParseResult<T> | null
   loading?: boolean
@@ -21,10 +21,10 @@ export function DropZone<T>({ label, accept = '.xlsx,.xlsm,.xls', onParsed, pars
       try {
         const buf = await file.arrayBuffer()
         const res = parse(buf)
-        onParsed(res, buf)
+        onParsed(res, buf, file.name)
       } catch (err) {
         const msg = getErrorMessage(err)
-        onParsed({ rows: [], leidas: 0, validas: 0, omitidas: 0, errores: [`Error al leer el archivo: ${msg}`], columnasFaltantes: [] }, new ArrayBuffer(0))
+        onParsed({ rows: [], leidas: 0, validas: 0, omitidas: 0, errores: [`Error al leer el archivo: ${msg}`], columnasFaltantes: [] }, new ArrayBuffer(0), file.name)
       }
     },
     [parse, onParsed]
