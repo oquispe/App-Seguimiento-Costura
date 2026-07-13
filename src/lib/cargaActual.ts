@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { normalize, normalizePO, stripColorCode } from './parsers/normalize'
+import { normalize, normalizePO, makeBaseKey, stripColorCode } from './parsers/normalize'
 import type { ItemCruzado, CortesRow } from '../types'
 
 /**
@@ -29,6 +29,7 @@ export async function publicarCargaActual(
   // 2. Upsert de los ítems actuales con todas las etapas de producción
   const rows = items.map((it, idx) => ({
     item_key:    it.item_key,
+    base_key:    it.base_key,
     sort_order:  idx,
     semana:      it.semana,
     cliente:     it.cliente,
@@ -91,19 +92,19 @@ export async function leerCargaActual(): Promise<ItemCruzado[]> {
   if (e1) throw e1
   if (!carga || carga.length === 0) return []
 
-  const keys = carga.map((r: { item_key: string }) => r.item_key)
+  const baseKeys = carga.map((r: { base_key: string }) => r.base_key)
 
   const { data: segs, error: e2 } = await supabase
     .from('seguimiento')
     .select('*')
-    .in('item_key', keys)
+    .in('base_key', baseKeys)
 
   if (e2) throw e2
 
-  const segMap = new Map((segs ?? []).map((s: { item_key: string }) => [s.item_key, s]))
+  const segMap = new Map((segs ?? []).map((s: { base_key: string }) => [s.base_key, s]))
 
   return carga.map((row: Record<string, unknown>) => {
-    const seg = segMap.get(row.item_key as string) as Record<string, unknown> | undefined
+    const seg = segMap.get(row.base_key as string) as Record<string, unknown> | undefined
     const parseDate = (v: unknown): Date | null => {
       if (!v) return null
       const s = String(v)
@@ -115,6 +116,7 @@ export async function leerCargaActual(): Promise<ItemCruzado[]> {
 
     return {
       item_key:    row.item_key,
+      base_key:    row.base_key,
       semana:      row.semana,
       cliente:     row.cliente,
       estilo:      row.estilo,
@@ -259,14 +261,22 @@ export async function actualizarStatusCortes(
   if (updateRows.length === 0)
     return { ok: false, actualizados: 0, error: 'Ninguna fila del Cortes coincide con ítems publicados' }
 
+  // Deduplicar por item_key antes del upsert para evitar
+  // "ON CONFLICT DO UPDATE command cannot affect row a second time"
+  // (ocurre cuando dos filas del Cortes resuelven al mismo item_key, ej.
+  // por un match ambiguo de color o filas duplicadas en el reporte).
+  const updateRowsMap = new Map<string, (typeof updateRows)[0]>()
+  for (const row of updateRows) updateRowsMap.set(row.item_key as string, row)
+  const updateRowsUnicos = Array.from(updateRowsMap.values())
+
   // Upsert: onConflict item_key → solo actualiza las columnas presentes en el payload
   const { error: e2 } = await supabase
     .from('carga_actual')
-    .upsert(updateRows, { onConflict: 'item_key' })
+    .upsert(updateRowsUnicos, { onConflict: 'item_key' })
 
   if (e2) return { ok: false, actualizados: 0, error: e2.message }
 
-  return { ok: true, actualizados: updateRows.length }
+  return { ok: true, actualizados: updateRowsUnicos.length }
 }
 
 /** Devuelve la fecha de la última publicación/actualización vigente */

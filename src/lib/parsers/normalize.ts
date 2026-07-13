@@ -24,6 +24,18 @@ export function makeItemKey(po: string, estilo: string, color: string, semana: s
 }
 
 /**
+ * Genera la llave base (PO|Estilo|Color, sin semana) que identifica al ítem
+ * de forma persistente a través de las semanas. A diferencia de item_key
+ * (que cambia cada semana porque incluye la semana), base_key es la que se
+ * usa para el seguimiento/bitácora (estado, compromisos, comentarios) —
+ * así, si el mismo PO+Estilo+Color sigue apareciendo en la semana siguiente,
+ * no pierde su historial solo porque avanzó de semana.
+ */
+export function makeBaseKey(po: string, estilo: string, color: string): string {
+  return `${normalizePO(po)}|${normalize(estilo)}|${normalize(color)}`
+}
+
+/**
  * Normaliza el color para matching flexible:
  * 1. "NAVY - NAVY"         → "NAVY"          (duplicado separado por guión)
  * 2. "0421 - Breaker Blue" → "BREAKER BLUE"  (código numérico al inicio)

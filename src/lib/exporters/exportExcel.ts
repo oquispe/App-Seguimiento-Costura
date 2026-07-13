@@ -19,8 +19,8 @@ export function exportarExcel(
 ): void {
   const comentariosPorKey = new Map<string, string>()
   for (const c of comentarios) {
-    const prev = comentariosPorKey.get(c.item_key) ?? ''
-    comentariosPorKey.set(c.item_key, prev ? `${prev}\n${c.texto}` : c.texto)
+    const prev = comentariosPorKey.get(c.base_key) ?? ''
+    comentariosPorKey.set(c.base_key, prev ? `${prev}\n${c.texto}` : c.texto)
   }
 
   const wsData = items.map((it) => ({
@@ -52,7 +52,7 @@ export function exportarExcel(
     'En Costura Líneas': it.en_costura_lineas,
     'En Acabado': it.en_acabado,
     'APT': it.apt,
-    'Comentarios': comentariosPorKey.get(it.item_key) ?? '',
+    'Comentarios': comentariosPorKey.get(it.base_key) ?? '',
   }))
 
   const ws = XLSX.utils.json_to_sheet(wsData)

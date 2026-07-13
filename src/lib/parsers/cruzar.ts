@@ -1,4 +1,4 @@
-import { normalizePO, normalize, makeItemKey, stripColorCode } from './normalize'
+import { normalizePO, normalize, makeItemKey, makeBaseKey, stripColorCode } from './normalize'
 import { diasRestantes, calcularSemaforo } from './dateUtils'
 import type {
   AuditoriaRow,
@@ -138,9 +138,11 @@ export function cruzarDatos(
 
     const diasFinal  = diasRestantes(pgo?.auditoria_final ?? null)
     const item_key   = makeItemKey(aud.po, aud.estilo, aud.color, aud.semana)
+    const base_key   = makeBaseKey(aud.po, aud.estilo, aud.color)
 
     items.push({
       item_key,
+      base_key,
       semana:      aud.semana,
       cliente:     aud.cliente,
       estilo:      aud.estilo,
