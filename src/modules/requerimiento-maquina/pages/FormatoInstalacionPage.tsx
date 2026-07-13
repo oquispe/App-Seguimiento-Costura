@@ -15,6 +15,7 @@ import {
   guardarGenerales,
 } from '../lib/formatoInstalacion'
 import { esOperacionManIns, ordenFirmasPara, puedeFirmar, calcularHFinCompleta } from '../lib/rolFirma'
+import { exportarFormatoExcel } from '../lib/exportFormatoExcel'
 import { FirmaModal } from '../components/FirmaModal'
 import type { BalanceReport, FormatoInstalacion, OperacionFormato, RolFirmaOperacion, RolFirmaFinal } from '../types'
 
@@ -50,6 +51,7 @@ export function FormatoInstalacionPage() {
   const [error, setError] = useState<string | null>(null)
   const [firmaAbierta, setFirmaAbierta] = useState<{ opKey: string; tipo: RolFirmaOperacion } | { tipo: RolFirmaFinal } | null>(null)
   const [accionError, setAccionError] = useState<string | null>(null)
+  const [exportando, setExportando] = useState(false)
 
   useEffect(() => {
     if (!reportKey) return
@@ -114,6 +116,19 @@ export function FormatoInstalacionPage() {
       setAccionError(getErrorMessage(err))
     }
   }, [reportKey])
+
+  const exportar = useCallback(async () => {
+    if (!reporte || !formato) return
+    setAccionError(null)
+    setExportando(true)
+    try {
+      await exportarFormatoExcel(reporte, formato)
+    } catch (err) {
+      setAccionError(getErrorMessage(err))
+    } finally {
+      setExportando(false)
+    }
+  }, [reporte, formato])
 
   if (cargando) {
     return <div className="flex items-center justify-center py-16"><Spinner size="lg" /></div>
@@ -305,11 +320,11 @@ export function FormatoInstalacionPage() {
 
       <div className="flex justify-between items-center">
         <button
-          disabled
-          title="Disponible en Fase 3"
-          className="text-xs font-medium text-ink-faint border border-line rounded-lg px-3 py-1.5 opacity-50 cursor-not-allowed"
+          onClick={exportar}
+          disabled={exportando}
+          className="text-xs font-medium text-brand-600 border border-brand-200 rounded-lg px-3 py-1.5 hover:bg-brand-50 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Exportar a Excel
+          {exportando ? 'Exportando…' : 'Exportar a Excel'}
         </button>
         <button
           onClick={() => navigate('/costura/requerimiento-maquina')}
