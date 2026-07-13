@@ -259,14 +259,22 @@ export async function actualizarStatusCortes(
   if (updateRows.length === 0)
     return { ok: false, actualizados: 0, error: 'Ninguna fila del Cortes coincide con ítems publicados' }
 
+  // Deduplicar por item_key antes del upsert para evitar
+  // "ON CONFLICT DO UPDATE command cannot affect row a second time"
+  // (ocurre cuando dos filas del Cortes resuelven al mismo item_key, ej.
+  // por un match ambiguo de color o filas duplicadas en el reporte).
+  const updateRowsMap = new Map<string, (typeof updateRows)[0]>()
+  for (const row of updateRows) updateRowsMap.set(row.item_key as string, row)
+  const updateRowsUnicos = Array.from(updateRowsMap.values())
+
   // Upsert: onConflict item_key → solo actualiza las columnas presentes en el payload
   const { error: e2 } = await supabase
     .from('carga_actual')
-    .upsert(updateRows, { onConflict: 'item_key' })
+    .upsert(updateRowsUnicos, { onConflict: 'item_key' })
 
   if (e2) return { ok: false, actualizados: 0, error: e2.message }
 
-  return { ok: true, actualizados: updateRows.length }
+  return { ok: true, actualizados: updateRowsUnicos.length }
 }
 
 /** Devuelve la fecha de la última publicación/actualización vigente */
