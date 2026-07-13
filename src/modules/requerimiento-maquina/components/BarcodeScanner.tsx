@@ -57,11 +57,32 @@ export function BarcodeScanner({ onDetected }: Props) {
 
     colaRef.current = colaRef.current.then(async () => {
       if (cancelado) return
-      scanner = new Html5Qrcode(contenedorId, { formatsToSupport: FORMATOS, verbose: false })
+      // useBarCodeDetectorIfSupported: en Chrome/Edge/Android usa la API nativa
+      // BarcodeDetector (mucho más confiable que ZXing-WASM para códigos de
+      // barras 1D como el Code128 de los carnés/DNI) y cae a ZXing solo si el
+      // navegador no la soporta.
+      scanner = new Html5Qrcode(contenedorId, {
+        formatsToSupport: FORMATOS,
+        useBarCodeDetectorIfSupported: true,
+        verbose: false,
+      })
       try {
         await scanner.start(
+          // El selector de cámara solo admite un key (facingMode o deviceId);
+          // la resolución va aparte, en `videoConstraints` de la config de scan.
           { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
+          {
+            fps: 10,
+            // qrbox rectangular (más ancho que alto): evita recortar un
+            // código de barras horizontal (carné/DNI) como pasaría con el
+            // cuadrado 250x250 pensado para QR.
+            qrbox: { width: 280, height: 180 },
+            videoConstraints: {
+              facingMode: 'environment',
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
+          },
           (decodedText) => {
             if (detectadoRef.current) return
             detectadoRef.current = true
