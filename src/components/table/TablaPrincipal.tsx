@@ -1,4 +1,5 @@
 import { Fragment, useState, useCallback, useMemo, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { ChevronRight, AlertCircle, ChevronDown, CalendarPlus, CalendarDays, GripVertical, MessageSquareText, RotateCcw } from 'lucide-react'
@@ -70,7 +71,7 @@ function getEtapaFinal(item: ItemCruzado): { label: string; cantidad: number } |
 }
 
 function PosicionChips({ item }: { item: ItemCruzado }) {
-  const [bitacoraOpen, setBitacoraOpen] = useState(false)
+  const [bitacoraAnchor, setBitacoraAnchor] = useState<DOMRect | null>(null)
 
   const compromisoEntries = useMemo(
     () =>
@@ -80,7 +81,11 @@ function PosicionChips({ item }: { item: ItemCruzado }) {
     [item.compromisos]
   )
   const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
-  const abrirBitacora = () => setBitacoraOpen((v) => !v)
+  const abrirBitacora = (e: React.MouseEvent<HTMLElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    setBitacoraAnchor((prev) => (prev ? null : rect))
+  }
+  const cerrarBitacora = () => setBitacoraAnchor(null)
 
   if (estaListoParaAuditar(item)) {
     const etapa = getEtapaFinal(item)
@@ -90,7 +95,9 @@ function PosicionChips({ item }: { item: ItemCruzado }) {
         {compromisoEntries.length > 0 && (
           <HistorialLink count={compromisoEntries.length} onClick={abrirBitacora} />
         )}
-        {bitacoraOpen && <BitacoraPopover entries={compromisoEntries} onClose={() => setBitacoraOpen(false)} />}
+        {bitacoraAnchor && (
+          <BitacoraPopover entries={compromisoEntries} anchorRect={bitacoraAnchor} onClose={cerrarBitacora} />
+        )}
       </div>
     )
   }
@@ -128,7 +135,9 @@ function PosicionChips({ item }: { item: ItemCruzado }) {
       {historialExtra.length > 0 && (
         <HistorialLink count={historialExtra.length} onClick={abrirBitacora} />
       )}
-      {bitacoraOpen && <BitacoraPopover entries={compromisoEntries} onClose={() => setBitacoraOpen(false)} />}
+      {bitacoraAnchor && (
+        <BitacoraPopover entries={compromisoEntries} anchorRect={bitacoraAnchor} onClose={cerrarBitacora} />
+      )}
     </div>
   )
 }
@@ -142,7 +151,7 @@ function AreaChip({ label, cantidad, compromiso, vencido, onOpenBitacora }: {
   cantidad: number
   compromiso: CompromisoEtapa | undefined
   vencido: boolean
-  onOpenBitacora: () => void
+  onOpenBitacora: (e: React.MouseEvent<HTMLElement>) => void
 }) {
   const fechaFmt = compromiso?.fecha_compromiso
     ? format(new Date(compromiso.fecha_compromiso + 'T12:00:00'), 'dd/MM', { locale: es })
@@ -152,7 +161,7 @@ function AreaChip({ label, cantidad, compromiso, vencido, onOpenBitacora }: {
   return (
     <button
       type="button"
-      onClick={clickable ? (e) => { e.stopPropagation(); onOpenBitacora() } : undefined}
+      onClick={clickable ? (e) => { e.stopPropagation(); onOpenBitacora(e) } : undefined}
       className={`inline-flex items-center gap-1.5 rounded-lg border pl-2 pr-1.5 py-1 text-[11px] font-semibold whitespace-nowrap transition-all ${
         vencido
           ? 'bg-gradient-to-r from-red-50 to-rose-50 border-red-200 text-red-700'
@@ -176,11 +185,11 @@ function AreaChip({ label, cantidad, compromiso, vencido, onOpenBitacora }: {
 
 // ─── Enlace discreto a la bitácora completa (historial fuera de las áreas activas) ─
 
-function HistorialLink({ count, onClick }: { count: number; onClick: () => void }) {
+function HistorialLink({ count, onClick }: { count: number; onClick: (e: React.MouseEvent<HTMLElement>) => void }) {
   return (
     <button
       type="button"
-      onClick={(e) => { e.stopPropagation(); onClick() }}
+      onClick={(e) => { e.stopPropagation(); onClick(e) }}
       className="inline-flex items-center gap-1 text-[10px] font-medium text-violet-600 hover:text-violet-800 transition-colors"
       title="Ver bitácora de compromisos"
     >
@@ -438,21 +447,40 @@ function EstadoCell({ item }: { item: ItemCruzado }) {
 
 // ─── Vista previa de bitácora de compromisos ──────────────────────────────────
 
-function BitacoraPopover({ entries, onClose }: { entries: [string, CompromisoEtapa][]; onClose: () => void }) {
+function BitacoraPopover({ entries, anchorRect, onClose }: {
+  entries: [string, CompromisoEtapa][]
+  anchorRect: DOMRect
+  onClose: () => void
+}) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose()
     }
+    // capture=true: el scroll horizontal de la tabla no burbujea hasta window,
+    // así que hay que escucharlo en fase de captura para cerrar el popover.
     document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    document.addEventListener('scroll', onClose, true)
+    window.addEventListener('resize', onClose)
+    return () => {
+      document.removeEventListener('mousedown', handler)
+      document.removeEventListener('scroll', onClose, true)
+      window.removeEventListener('resize', onClose)
+    }
   }, [onClose])
 
-  return (
+  const ANCHO = 256
+  const left = Math.min(anchorRect.left, window.innerWidth - ANCHO - 8)
+  const top = anchorRect.bottom + 4
+
+  // Portal a document.body: escapa del contenedor con overflow-x-auto de la
+  // tabla, que si no recortaría este popover y lo dejaría invisible.
+  return createPortal(
     <div
       ref={ref}
-      className="absolute z-30 top-full left-0 mt-1 w-64 bg-white border border-line rounded-lg shadow-lg p-3 space-y-2"
+      className="fixed z-50 bg-white border border-line rounded-lg shadow-lg p-3 space-y-2"
+      style={{ top, left, width: ANCHO }}
       onClick={(e) => e.stopPropagation()}
     >
       <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Bitácora de compromisos</p>
@@ -475,7 +503,8 @@ function BitacoraPopover({ entries, onClose }: { entries: [string, CompromisoEta
           </div>
         ))
       )}
-    </div>
+    </div>,
+    document.body
   )
 }
 

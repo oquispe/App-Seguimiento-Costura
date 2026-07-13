@@ -109,17 +109,27 @@ export function MainPage() {
     if (state.items.length === 0) return
     setLoadingSeg(true)
     try {
-      const keys = state.items.map((i) => i.item_key)
-      const segs = await cargarSeguimiento(keys)
-      mergeSegimiento(segs.map((s) => ({
-        item_key: s.item_key,
-        estado: s.estado,
-        resultado: s.resultado,
-        fecha_solicitada: s.fecha_solicitada,
-        fecha_auditoria: s.fecha_auditoria,
-        solicitado_por: s.solicitado_por,
-        responsable: s.responsable,
-      })))
+      const baseKeys = state.items.map((i) => i.base_key)
+      const segs = await cargarSeguimiento(baseKeys)
+      const segPorBaseKey = new Map(segs.map((s) => [s.base_key, s]))
+      const merges = state.items
+        .map((it) => {
+          const s = segPorBaseKey.get(it.base_key)
+          if (!s) return null
+          return {
+            item_key: it.item_key,
+            estado: s.estado,
+            resultado: s.resultado,
+            fecha_solicitada: s.fecha_solicitada,
+            fecha_auditoria: s.fecha_auditoria,
+            solicitado_por: s.solicitado_por,
+            responsable: s.responsable,
+            compromisos: s.compromisos ?? {},
+            auditoria_final_override: s.auditoria_final_override,
+          }
+        })
+        .filter((s): s is NonNullable<typeof s> => s !== null)
+      mergeSegimiento(merges)
     } finally {
       setLoadingSeg(false)
     }
@@ -132,27 +142,29 @@ export function MainPage() {
 
   const handleCerrarAuditoria = useCallback(async (itemKey: string) => {
     const item = state.items.find((i) => i.item_key === itemKey)
+    if (!item) return
     const { error } = await supabase
       .from('seguimiento')
-      .upsert({ item_key: itemKey, estado: 'Aprobada' as const }, { onConflict: 'item_key' })
+      .upsert({ base_key: item.base_key, item_key: itemKey, estado: 'Aprobada' as const }, { onConflict: 'base_key' })
     if (error) { console.error('Error cerrando auditoría:', error); return }
-    mergeSegimiento([{ item_key: itemKey, estado: 'Aprobada', compromisos: item?.compromisos ?? {} }])
+    mergeSegimiento([{ item_key: itemKey, estado: 'Aprobada', compromisos: item.compromisos ?? {} }])
   }, [state.items, mergeSegimiento])
 
   const handleReabrirAuditoria = useCallback(async (itemKey: string) => {
     const item = state.items.find((i) => i.item_key === itemKey)
+    if (!item) return
     const { error } = await supabase
       .from('seguimiento')
-      .upsert({ item_key: itemKey, estado: 'Pendiente' as const }, { onConflict: 'item_key' })
+      .upsert({ base_key: item.base_key, item_key: itemKey, estado: 'Pendiente' as const }, { onConflict: 'base_key' })
     if (error) { console.error('Error reabriendo auditoría:', error); return }
-    mergeSegimiento([{ item_key: itemKey, estado: 'Pendiente', compromisos: item?.compromisos ?? {} }])
+    mergeSegimiento([{ item_key: itemKey, estado: 'Pendiente', compromisos: item.compromisos ?? {} }])
   }, [state.items, mergeSegimiento])
 
   const handleExportar = useCallback(async () => {
     // Cargar todos los comentarios de los ítems visibles
     const comentarios: import('../types').ComentarioRecord[] = []
     for (const it of itemsFiltrados.slice(0, 200)) {
-      const cms = await cargarComentarios(it.item_key)
+      const cms = await cargarComentarios(it.base_key)
       comentarios.push(...cms)
     }
     exportarExcel(itemsFiltrados, comentarios)
@@ -227,18 +239,22 @@ export function MainPage() {
     const diasFinal = diasRestantes(newDateObj)
     const newSemaforo = calcularSemaforo(diasFinal)
 
-    const upsertRows = itemKeys.map((key) => {
-      const item = state.items.find((i) => i.item_key === key)
-      return {
-        item_key: key,
-        estado: item?.estado ?? 'Pendiente',
-        auditoria_final_override: newDate,
-      }
-    })
+    const upsertRows = itemKeys
+      .map((key) => {
+        const item = state.items.find((i) => i.item_key === key)
+        if (!item) return null
+        return {
+          base_key: item.base_key,
+          item_key: key,
+          estado: item.estado ?? 'Pendiente',
+          auditoria_final_override: newDate,
+        }
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null)
 
     const { error } = await supabase
       .from('seguimiento')
-      .upsert(upsertRows, { onConflict: 'item_key' })
+      .upsert(upsertRows, { onConflict: 'base_key' })
 
     if (error) { console.error('Error guardando fecha:', error); return }
 
