@@ -41,50 +41,60 @@ export function BarcodeScanner({ onDetected }: Props) {
   // efecto hacía que la cámara se reiniciara sola mientras estaba activa.
   const onDetectedRef = useRef(onDetected)
   onDetectedRef.current = onDetected
+  // Cola que serializa inicio/detención de la cámara entre invocaciones del
+  // efecto. React.StrictMode (activo en main.tsx) monta→desmonta→monta este
+  // efecto en desarrollo; como start() es async, el desmontaje fantasma no
+  // alcanza a frenarlo antes de que el segundo montaje pida la cámara de
+  // nuevo, y dos getUserMedia() simultáneos sobre el mismo dispositivo
+  // suelen fallar con NotReadableError aunque el permiso ya esté concedido.
+  const colaRef = useRef<Promise<void>>(Promise.resolve())
 
   useEffect(() => {
     if (!activo) return
     detectadoRef.current = false
     let cancelado = false
-    const scanner = new Html5Qrcode(contenedorId, { formatsToSupport: FORMATOS, verbose: false })
+    let scanner: Html5Qrcode | null = null
 
-    const detener = () => {
-      if (scanner.getState() === Html5QrcodeScannerState.NOT_STARTED) return
-      scanner
-        .stop()
-        .catch(() => {})
-        .then(() => {
+    colaRef.current = colaRef.current.then(async () => {
+      if (cancelado) return
+      scanner = new Html5Qrcode(contenedorId, { formatsToSupport: FORMATOS, verbose: false })
+      try {
+        await scanner.start(
+          { facingMode: 'environment' },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          (decodedText) => {
+            if (detectadoRef.current) return
+            detectadoRef.current = true
+            onDetectedRef.current(decodedText)
+            setActivo(false)
+          },
+          () => {
+            // frame no decodificable, se reintenta en el próximo tick
+          }
+        )
+        if (cancelado) {
+          await scanner.stop().catch(() => {})
           try { scanner.clear() } catch { /* contenedor ya desmontado */ }
-        })
-    }
-
-    scanner
-      .start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        (decodedText) => {
-          if (detectadoRef.current) return
-          detectadoRef.current = true
-          onDetectedRef.current(decodedText)
-          setActivo(false)
-        },
-        () => {
-          // frame no decodificable, se reintenta en el próximo tick
         }
-      )
-      .catch((err) => {
+      } catch (err) {
         if (cancelado) return
-        setError(err instanceof Error ? err.message : 'No se pudo acceder a la cámara')
+        // html5-qrcode rechaza con un string plano ("Error getting userMedia,
+        // error = NotReadableError: ...", etc.), no con un Error — si solo
+        // miramos err.message perdemos el motivo real (permiso denegado,
+        // cámara ocupada por otra app/pestaña, no hay cámara, etc).
+        const mensaje = err instanceof Error ? err.message : String(err)
+        setError(mensaje || 'No se pudo acceder a la cámara')
         setActivo(false)
-      })
+      }
+    })
 
     return () => {
       cancelado = true
-      try {
-        detener()
-      } catch {
-        // stop() puede lanzar de forma síncrona si el escáner ya no está corriendo
-      }
+      colaRef.current = colaRef.current.then(async () => {
+        if (!scanner || scanner.getState() === Html5QrcodeScannerState.NOT_STARTED) return
+        await scanner.stop().catch(() => {})
+        try { scanner!.clear() } catch { /* contenedor ya desmontado */ }
+      })
     }
   }, [activo, contenedorId])
 
