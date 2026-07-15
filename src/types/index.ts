@@ -68,6 +68,9 @@ export interface OpDetalle {
 
 export interface ItemCruzado {
   item_key: string
+  // Llave persistente (PO|Estilo|Color, sin semana) para el seguimiento —
+  // ver makeBaseKey() en lib/parsers/normalize.ts.
+  base_key: string
   semana: string
   cliente: string
   estilo: string
@@ -137,6 +140,7 @@ export type CompromisosEtapas = Record<string, CompromisoEtapa>
 // ─── Seguimiento (tabla Supabase) ──────────────────────────────────────────────
 
 export interface SeguimientoRecord {
+  base_key: string
   item_key: string
   cliente: string | null
   estilo: string | null
@@ -157,6 +161,7 @@ export interface SeguimientoRecord {
 
 export interface ComentarioRecord {
   id?: number
+  base_key: string
   item_key: string
   autor: string
   texto: string

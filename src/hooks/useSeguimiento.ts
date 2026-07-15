@@ -3,18 +3,19 @@ import { supabase } from '../lib/supabase'
 import type { SeguimientoRecord, ComentarioRecord, ItemCruzado } from '../types'
 
 export function useSeguimiento() {
-  const cargarSeguimiento = useCallback(async (itemKeys: string[]) => {
-    if (itemKeys.length === 0) return []
+  const cargarSeguimiento = useCallback(async (baseKeys: string[]) => {
+    if (baseKeys.length === 0) return []
     const { data, error } = await supabase
       .from('seguimiento')
       .select('*')
-      .in('item_key', itemKeys)
+      .in('base_key', baseKeys)
     if (error) throw error
     return (data ?? []) as SeguimientoRecord[]
   }, [])
 
   const guardarSeguimiento = useCallback(async (item: ItemCruzado) => {
     const record: SeguimientoRecord = {
+      base_key:        item.base_key,
       item_key:        item.item_key,
       cliente:         item.cliente,
       estilo:          item.estilo,
@@ -34,7 +35,7 @@ export function useSeguimiento() {
     }
     const { error } = await supabase
       .from('seguimiento')
-      .upsert(record, { onConflict: 'item_key' })
+      .upsert(record, { onConflict: 'base_key' })
     if (error) throw error
   }, [])
 
@@ -48,11 +49,11 @@ export function useSeguimiento() {
     []
   )
 
-  const cargarComentarios = useCallback(async (item_key: string) => {
+  const cargarComentarios = useCallback(async (base_key: string) => {
     const { data, error } = await supabase
       .from('comentarios')
       .select('*')
-      .eq('item_key', item_key)
+      .eq('base_key', base_key)
       .order('created_at', { ascending: true })
     if (error) throw error
     return (data ?? []) as ComentarioRecord[]
