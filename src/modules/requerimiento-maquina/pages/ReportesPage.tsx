@@ -5,12 +5,22 @@ import { DropZone } from '../../../components/upload/DropZone'
 import { Badge } from '../../../components/ui/Badge'
 import { Spinner } from '../../../components/ui/Spinner'
 import { getErrorMessage } from '../../../lib/errorUtils'
+import { cn } from '../../../lib/utils'
 import { parseBalanceExcel } from '../lib/parseBalanceExcel'
 import { parseEmpleados } from '../lib/parseEmpleados'
 import { guardarReporte, listarReportes, eliminarReporte, guardarEmpleados } from '../lib/rmReports'
 import { DrawerReporte } from '../components/DrawerReporte'
 import type { BalanceReport, EmpleadoRow } from '../types'
 import type { ParseResult } from '../../../types'
+
+function StatCard({ label, value, accent }: { label: string; value: string | number; accent?: boolean }) {
+  return (
+    <div className="rounded-xl border border-line bg-white p-4 text-center">
+      <div className={cn('text-2xl font-bold', accent ? 'text-brand-600' : 'text-ink')}>{value}</div>
+      <div className="mt-1 text-xs text-ink-muted">{label}</div>
+    </div>
+  )
+}
 
 export function ReportesPage() {
   const [reportes, setReportes] = useState<BalanceReport[]>([])
@@ -114,8 +124,14 @@ export function ReportesPage() {
     [reportes, filtroLinea, filtroCliente]
   )
 
+  const eficienciaProm = useMemo(() => {
+    const valores = reportes.map((r) => Number(r.eficiencia)).filter((v) => !Number.isNaN(v))
+    if (valores.length === 0) return null
+    return valores.reduce((acc, v) => acc + v, 0) / valores.length
+  }, [reportes])
+
   return (
-    <div className="p-4 md:p-6 space-y-4">
+    <div className="p-4 md:p-6 space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
@@ -135,55 +151,78 @@ export function ReportesPage() {
         </button>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
-        <DropZone<BalanceReport>
-          label="Cargar Excel de balance de línea"
-          onParsed={handleParsedBalance}
-          parse={parseBalanceExcel}
-          result={parseResult}
-          loading={guardando}
-        />
-        {mostrarEmpleados && (
-          <DropZone<EmpleadoRow>
-            label="Cargar registros.xlsx (empleados)"
-            onParsed={handleParsedEmpleados}
-            parse={parseEmpleados}
-            result={empleadosResult}
-            loading={guardandoEmpleados}
-          />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatCard label="Reportes cargados" value={reportes.length} />
+        <StatCard label="Líneas activas" value={lineas.length} />
+        <StatCard label="Clientes" value={clientes.length} />
+        <StatCard label="Eficiencia prom." value={eficienciaProm != null ? `${eficienciaProm.toFixed(1)}%` : '—'} accent />
+      </div>
+
+      <div className="rounded-xl border border-line bg-white p-4">
+        <h2 className="mb-3 text-sm font-semibold text-ink">Cargar nuevo balance de línea</h2>
+        <div className="flex flex-col gap-4 md:flex-row">
+          <div className="flex-1">
+            <DropZone<BalanceReport>
+              label="Cargar Excel de balance de línea"
+              onParsed={handleParsedBalance}
+              parse={parseBalanceExcel}
+              result={parseResult}
+              loading={guardando}
+            />
+          </div>
+          {mostrarEmpleados && (
+            <div className="flex-1">
+              <DropZone<EmpleadoRow>
+                label="Cargar registros.xlsx (empleados)"
+                onParsed={handleParsedEmpleados}
+                parse={parseEmpleados}
+                result={empleadosResult}
+                loading={guardandoEmpleados}
+              />
+            </div>
+          )}
+        </div>
+
+        {guardadoMsg && (
+          <p className={`mt-3 text-xs ${guardadoMsg.startsWith('Error') ? 'text-red-600' : 'text-emerald-600'}`}>
+            {guardadoMsg}
+          </p>
         )}
       </div>
 
-      {guardadoMsg && (
-        <p className={`text-xs ${guardadoMsg.startsWith('Error') ? 'text-red-600' : 'text-emerald-600'}`}>
-          {guardadoMsg}
-        </p>
-      )}
-
-      <div className="flex items-center gap-3 flex-wrap">
-        <select
-          value={filtroCliente}
-          onChange={(e) => setFiltroCliente(e.target.value)}
-          className="text-xs border border-line rounded-lg px-2.5 py-1.5 text-ink-muted bg-white"
-        >
-          <option value="">Todos los clientes</option>
-          {clientes.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
-        <select
-          value={filtroLinea}
-          onChange={(e) => setFiltroLinea(e.target.value)}
-          className="text-xs border border-line rounded-lg px-2.5 py-1.5 text-ink-muted bg-white"
-        >
-          <option value="">Todas las líneas</option>
-          {lineas.map((l) => (
-            <option key={l} value={l}>Línea {l}</option>
-          ))}
-        </select>
+      <div className="rounded-xl border border-line bg-white p-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink-muted">Cliente</label>
+            <select
+              value={filtroCliente}
+              onChange={(e) => setFiltroCliente(e.target.value)}
+              className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-xs text-ink"
+            >
+              <option value="">Todos los clientes</option>
+              {clientes.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink-muted">Línea</label>
+            <select
+              value={filtroLinea}
+              onChange={(e) => setFiltroLinea(e.target.value)}
+              className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-xs text-ink"
+            >
+              <option value="">Todas las líneas</option>
+              {lineas.map((l) => (
+                <option key={l} value={l}>Línea {l}</option>
+              ))}
+            </select>
+          </div>
+        </div>
       </div>
 
-      <div className="border border-line rounded-xl overflow-hidden bg-white">
+      <div className="rounded-xl border border-line bg-white overflow-hidden">
+        <h2 className="px-4 pt-4 pb-3 text-sm font-semibold text-ink">Reportes cargados</h2>
         {cargandoLista ? (
           <div className="flex items-center justify-center py-12">
             <Spinner />
