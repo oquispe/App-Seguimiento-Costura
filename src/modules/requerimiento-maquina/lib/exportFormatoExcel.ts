@@ -20,13 +20,14 @@ const thinBorder = {
 const centrado = { horizontal: 'center' as const, vertical: 'middle' as const, wrapText: true }
 const izquierda = { horizontal: 'left' as const, vertical: 'middle' as const, wrapText: true }
 
-/** Parsea "HH:MM" y devuelve minutos transcurridos entre dos horas del mismo día. */
+/** Parsea "HH:MM" y devuelve minutos transcurridos entre dos horas, asumiendo que si la hora fin es menor a la de inicio el turno cruzó medianoche. */
 function calcularMinutos(hInicio?: string, hFin?: string): number | '' {
   if (!hInicio || !hFin) return ''
   const [h1, m1] = hInicio.split(':').map(Number)
   const [h2, m2] = hFin.split(':').map(Number)
   if ([h1, m1, h2, m2].some((n) => Number.isNaN(n))) return ''
-  return h2 * 60 + m2 - (h1 * 60 + m1)
+  const diff = h2 * 60 + m2 - (h1 * 60 + m1)
+  return diff < 0 ? diff + 24 * 60 : diff
 }
 
 function minutosDesdeInicio(hInicio: string | undefined, horaFirma: string | undefined): string {
