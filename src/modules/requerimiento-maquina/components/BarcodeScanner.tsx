@@ -10,12 +10,17 @@ import { Camera, CameraOff } from 'lucide-react'
  * confiable), mientras que esta librería funciona igual en cualquier
  * navegador moderno con `getUserMedia`. Formatos calcados del original:
  * code_128, code_39, code_93, ean_13, ean_8, upc_a, upc_e, codabar, itf, y
- * qr_code para códigos QR. La entrada manual (que también funciona con
- * lectores de código de barras USB tipo teclado) sigue disponible siempre.
+ * qr_code para códigos QR. Se suma pdf_417 porque el DNI peruano (RENIEC)
+ * trae justamente ese formato apilado 2D en el reverso del carné — sin él
+ * en la lista, el scanner nunca reconoce el patrón y se queda reintentando
+ * en silencio, dando la sensación de que "no sabe cuándo capturar". La
+ * entrada manual (que también funciona con lectores de código de barras
+ * USB tipo teclado) sigue disponible siempre.
  */
 
 const FORMATOS = [
   Html5QrcodeSupportedFormats.QR_CODE,
+  Html5QrcodeSupportedFormats.PDF_417,
   Html5QrcodeSupportedFormats.CODE_128,
   Html5QrcodeSupportedFormats.CODE_39,
   Html5QrcodeSupportedFormats.CODE_93,
