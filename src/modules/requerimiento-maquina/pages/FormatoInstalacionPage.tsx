@@ -193,7 +193,101 @@ export function FormatoInstalacionPage() {
 
       <section className="border border-line rounded-xl bg-white overflow-hidden">
         <h2 className="text-xs font-semibold text-ink-muted uppercase tracking-wide px-4 pt-4">Operarios y operaciones</h2>
-        <div className="overflow-x-auto">
+
+        {/* Móvil: una tarjeta por fila con las firmas apiladas verticalmente
+            (nombre de rol completo, no abreviado) en vez de la tabla ancha,
+            para no depender de scroll horizontal ni de textos truncados. */}
+        <div className="divide-y divide-line md:hidden">
+          {filas.map((fila) => {
+            const op: OperacionFormato = formato.operaciones_json[fila.opKey] ?? {}
+            const completa = calcularHFinCompleta(op, fila.esManIns)
+            return (
+              <div key={fila.opKey} className="p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-ink">{fila.item}. {fila.operario}</p>
+                    <p className="text-xs text-ink-muted">
+                      <span className="font-mono">{fila.codigo}</span> {fila.descripcion}
+                    </p>
+                    <p className="mt-0.5 text-xs text-ink-faint">
+                      {fila.maquina} · {fila.minutosReq} min
+                      {fila.esManIns && <Badge variant="cyan" className="ml-1">MAN/INS</Badge>}
+                    </p>
+                  </div>
+                  {op.h_fin ? (
+                    completa ? <Badge variant="verde">Listo</Badge> : null
+                  ) : null}
+                </div>
+
+                <div className="flex items-center gap-3 text-xs">
+                  <span className="text-ink-faint">H.Inicio: {op.h_inicio ?? '—'}</span>
+                  <span className="text-ink-faint">H.Fin: {op.h_fin ?? '—'}</span>
+                  {!op.h_inicio && (
+                    <button
+                      onClick={() => iniciar(fila.opKey)}
+                      className="flex items-center gap-1 text-brand-600 hover:underline"
+                    >
+                      <Play className="w-3 h-3" /> Iniciar
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <p className="text-[11px] font-medium text-ink-faint uppercase tracking-wide">Firmas</p>
+                  {ordenFirmasPara(fila.esManIns).map((rol) => {
+                    const firmado = !!op[`firma_${rol}` as const]
+                    const nombre = op[`nombre_firma_${rol}` as const]
+                    const hora = op[`hora_firma_${rol}` as const]
+                    const metodoFirma = op[`metodo_firma_${rol}` as const]
+                    const validacion = puedeFirmar(op, rol, fila.esManIns)
+                    return (
+                      <button
+                        key={rol}
+                        disabled={firmado || !validacion.ok}
+                        onClick={() => setFirmaAbierta({ opKey: fila.opKey, tipo: rol })}
+                        className={`flex w-full items-start justify-between gap-2 rounded-lg border px-3 py-2 text-left ${
+                          firmado
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                            : validacion.ok
+                              ? 'border-line text-ink hover:bg-surface'
+                              : 'border-line text-ink-faint opacity-50'
+                        }`}
+                      >
+                        <span className="flex items-center gap-1.5">
+                          {firmado ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <Circle className="w-4 h-4 shrink-0" />}
+                          <span className="text-xs font-medium capitalize">{rol.replace('_', ' ')}</span>
+                        </span>
+                        <span className="max-w-[55%] text-right text-[11px]">
+                          {firmado ? (
+                            <span className="flex items-center justify-end gap-1">
+                              {nombre} ({hora}) <IconoMetodo metodo={metodoFirma} />
+                            </span>
+                          ) : validacion.ok ? (
+                            'Firmar'
+                          ) : (
+                            validacion.motivo
+                          )}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-[11px] font-medium text-ink-faint uppercase tracking-wide">Comentario</label>
+                  <input
+                    defaultValue={op.comentario ?? ''}
+                    onBlur={(e) => comentarioCambiado(fila.opKey, e.target.value)}
+                    className="w-full text-xs border border-line rounded-lg px-2 py-1.5"
+                  />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Desktop/tablet: tabla completa */}
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-xs mt-3">
             <thead>
               <tr className="text-left text-ink-faint border-y border-line bg-surface">
