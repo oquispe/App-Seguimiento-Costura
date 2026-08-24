@@ -12,10 +12,16 @@ export function normalize(text: unknown): string {
     .trim()
 }
 
-/** Normaliza un PO: trim + mayúsculas + sin espacios dobles */
+/**
+ * Normaliza un PO: trim + mayúsculas + sin espacios dobles.
+ * Algunos reportes de origen (ej. rptReporteSituacionOrdenesNew1) exportan el
+ * PO como texto con un punto final sobrante (ej. "47710." en vez de "47710"),
+ * lo que rompe el cruce exacto contra Auditorías. Un punto final no aporta
+ * significado en un PO, así que se elimina.
+ */
 export function normalizePO(po: unknown): string {
   if (po === null || po === undefined) return ''
-  return String(po).trim().toUpperCase().replace(/\s+/g, ' ')
+  return String(po).trim().toUpperCase().replace(/\s+/g, ' ').replace(/\.+$/, '')
 }
 
 /** Genera item_key compuesto para upsert */

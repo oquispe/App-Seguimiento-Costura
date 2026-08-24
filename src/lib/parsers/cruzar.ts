@@ -20,7 +20,7 @@ function toNum(v: unknown): number {
  * Agrupa filas de líneas (status.xlsm) por línea normalizada, sumando
  * cantidades — una misma OP puede tener varias partidas en la misma línea.
  */
-function agruparLineas(rows: LineaRow[]): LineaDetalle[] {
+export function agruparLineas(rows: LineaRow[]): LineaDetalle[] {
   const acum = new Map<string, LineaDetalle>()
   for (const r of rows) {
     const key = normalize(r.linea)
@@ -46,7 +46,7 @@ function agruparLineas(rows: LineaRow[]): LineaDetalle[] {
  * ambos reportes traen OP), y si no hay match cae a PO+Estilo+Color fuzzy
  * (mismo criterio que buscarCorte) para tolerar OPs vacías o desalineadas.
  */
-function buscarLineas(
+export function buscarLineas(
   po: string,
   op: string,
   estilo: string,
@@ -157,14 +157,11 @@ function buscarCorte(
   return null
 }
 
-export function cruzarDatos(
-  auditorias: AuditoriaRow[],
-  pgos: PgoRow[],
-  cortes: CortesRow[],
-  llave: LlaveCruce = 'PO',
-  lineas: LineaRow[] = []
-): { items: ItemCruzado[]; diagnostico: DiagnosticoCruce } {
-  // Índice de líneas (status.xlsm): PO+OP exacto, y PO (para fallback fuzzy)
+/** Índice de líneas (status.xlsm): PO+OP exacto, y PO (para fallback fuzzy). */
+export function indexarLineas(lineas: LineaRow[]): {
+  lineasPorPOOp: Map<string, LineaRow[]>
+  lineasPorPO: Map<string, LineaRow[]>
+} {
   const lineasPorPOOp = new Map<string, LineaRow[]>()
   const lineasPorPO = new Map<string, LineaRow[]>()
   for (const l of lineas) {
@@ -177,6 +174,17 @@ export function cruzarDatos(
     arrPO.push(l)
     lineasPorPO.set(kPO, arrPO)
   }
+  return { lineasPorPOOp, lineasPorPO }
+}
+
+export function cruzarDatos(
+  auditorias: AuditoriaRow[],
+  pgos: PgoRow[],
+  cortes: CortesRow[],
+  llave: LlaveCruce = 'PO',
+  lineas: LineaRow[] = []
+): { items: ItemCruzado[]; diagnostico: DiagnosticoCruce } {
+  const { lineasPorPOOp, lineasPorPO } = indexarLineas(lineas)
 
   // Índice PGO
   const pgoIdx = new Map<string, PgoRow>()

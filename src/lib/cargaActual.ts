@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import { normalize, normalizePO, makeBaseKey, stripColorCode } from './parsers/normalize'
-import type { ItemCruzado, CortesRow } from '../types'
+import { agruparLineas, buscarLineas, indexarLineas } from './parsers/cruzar'
+import type { ItemCruzado, CortesRow, LineaRow } from '../types'
 
 /**
  * Guarda el dataset cruzado en "carga_actual" (Supabase).
@@ -280,6 +281,50 @@ export async function actualizarStatusCortes(
   if (e2) return { ok: false, actualizados: 0, error: e2.message }
 
   return { ok: true, actualizados: updateRowsUnicos.length }
+}
+
+/**
+ * Actualización mid-semana del detalle por línea (StatusCorte). Separada de
+ * actualizarStatusCortes porque ese reporte no siempre se sube el mismo día
+ * que el Cortes — sin esto, "lineas" quedaba congelado con los datos de la
+ * publicación del lunes aunque en_costura_lineas sí se refrescara a diario.
+ */
+export async function actualizarLineas(
+  lineasRows: LineaRow[],
+  cargadoPor: string
+): Promise<{ ok: boolean; actualizados: number; error?: string }> {
+  if (lineasRows.length === 0) return { ok: false, actualizados: 0, error: 'Sin filas de líneas' }
+
+  const { data: vigentes, error: e1 } = await supabase
+    .from('carga_actual')
+    .select('item_key, po, op, estilo, color')
+    .eq('vigente', true)
+
+  if (e1) return { ok: false, actualizados: 0, error: e1.message }
+  if (!vigentes || vigentes.length === 0)
+    return { ok: false, actualizados: 0, error: 'No hay ítems publicados vigentes' }
+
+  const { lineasPorPOOp, lineasPorPO } = indexarLineas(lineasRows)
+
+  const ahora = new Date().toISOString()
+  type Vigente = { item_key: string; po: string; op: string | null; estilo: string | null; color: string }
+  const updateRows = (vigentes as Vigente[]).map((v) => {
+    const lineasMatch = buscarLineas(v.po, v.op ?? '', v.estilo ?? '', v.color, lineasPorPOOp, lineasPorPO)
+    return {
+      item_key:    v.item_key,
+      lineas:      agruparLineas(lineasMatch),
+      cargado_por: cargadoPor,
+      cargado_at:  ahora,
+    }
+  })
+
+  const { error: e2 } = await supabase
+    .from('carga_actual')
+    .upsert(updateRows, { onConflict: 'item_key' })
+
+  if (e2) return { ok: false, actualizados: 0, error: e2.message }
+
+  return { ok: true, actualizados: updateRows.length }
 }
 
 /** Devuelve la fecha de la última publicación/actualización vigente */

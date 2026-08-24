@@ -9,6 +9,17 @@ function toNum(v: unknown): number {
 }
 
 /**
+ * El reporte de origen a veces trae "EN PROCESO" negativo, como el exacto
+ * opuesto de "EN ESTANTERIA" (ej. estanteria=559, proceso=-559), aparentando
+ * un movimiento/traspaso en vez de una cantidad real. Sin este clamp, la suma
+ * cancela ambos valores a 0 y la prenda desaparece de la línea aunque siga
+ * físicamente ahí.
+ */
+function toNumNoNegativo(v: unknown): number {
+  return Math.max(0, toNum(v))
+}
+
+/**
  * El reporte de origen no es consistente entre exportaciones: a veces trae
  * "Linea_Costura" (con guión bajo) y otras "LINEA COSTURA" (con espacio).
  * Se normaliza el guión bajo como si fuera espacio para tolerar ambas.
@@ -91,8 +102,8 @@ export function parseLineas(buffer: ArrayBuffer): ParseResult<LineaRow> {
     const estilo = 'estilo' in colIdx ? String(row[colIdx['estilo']] ?? '').trim() : ''
     const color  = 'color' in colIdx  ? String(row[colIdx['color']] ?? '').trim()  : ''
     const linea  = 'linea' in colIdx  ? String(row[colIdx['linea']] ?? '').trim()  : ''
-    const enEst  = 'en_estanteria' in colIdx ? toNum(row[colIdx['en_estanteria']]) : 0
-    const enProc = 'en_proceso'    in colIdx ? toNum(row[colIdx['en_proceso']])    : 0
+    const enEst  = 'en_estanteria' in colIdx ? toNumNoNegativo(row[colIdx['en_estanteria']]) : 0
+    const enProc = 'en_proceso'    in colIdx ? toNumNoNegativo(row[colIdx['en_proceso']])    : 0
 
     if (!linea) { omitidas++; continue }
 

@@ -3,7 +3,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { Upload, BarChart3, Users, Download, LogOut, Wand2, Cloud, RefreshCw, MessageCircle, X, ClipboardList } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { publicarCargaActual, leerCargaActual, guardarSnapshot, actualizarStatusCortes, leerUltimaActualizacion } from '../lib/cargaActual'
+import { publicarCargaActual, leerCargaActual, guardarSnapshot, actualizarStatusCortes, actualizarLineas, leerUltimaActualizacion } from '../lib/cargaActual'
 import { diasRestantes, calcularSemaforo } from '../lib/parsers/dateUtils'
 import { DropZone } from '../components/upload/DropZone'
 import { PanelDiagnostico } from '../components/upload/DiagnosticoCruce'
@@ -51,6 +51,7 @@ export function MainPage() {
   const [fechaActualizacion, setFechaActualizacion] = useState<Date | null>(null)
   const [chatAbierto, setChatAbierto] = useState(false)
   const [cortesUpdate, setCortesUpdate] = useState<ParseResult<CortesRow> | null>(null)
+  const [lineasUpdate, setLineasUpdate] = useState<ParseResult<LineaRow> | null>(null)
   const [actualizando, setActualizando] = useState(false)
   const [actualizadoMsg, setActualizadoMsg] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState('')
@@ -211,30 +212,42 @@ export function MainPage() {
   }, [setItemsDesdeNube])
 
   const handleActualizarCortes = useCallback(async () => {
-    if (!cortesUpdate || cortesUpdate.rows.length === 0) return
+    const hayCortes = !!cortesUpdate && cortesUpdate.rows.length > 0
+    const hayLineas = !!lineasUpdate && lineasUpdate.rows.length > 0
+    if (!hayCortes && !hayLineas) return
     setActualizando(true)
     setActualizadoMsg(null)
     try {
-      const { ok, actualizados, error } = await actualizarStatusCortes(cortesUpdate.rows, userEmail)
-      if (ok) {
-        setActualizadoMsg(`✓ ${actualizados} ítems actualizados — refrescando...`)
-        // Refrescar datos en pantalla para todos
-        const items = await leerCargaActual()
-        if (items.length > 0) {
-          const recalc = items.map((it) => {
-            const diasFinal = diasRestantes(it.auditoria_final)
-            return { ...it, dias_fin_entrega: diasRestantes(it.fin_entrega), dias_auditoria_final: diasFinal, semaforo: calcularSemaforo(diasFinal) } satisfies ItemCruzado
-          })
-          setItemsDesdeNube(recalc)
-        }
-        setActualizadoMsg(`✓ ${actualizados} ítems de producción actualizados`)
-      } else {
-        setActualizadoMsg(`Error: ${error}`)
+      const [resCortes, resLineas] = await Promise.all([
+        hayCortes ? actualizarStatusCortes(cortesUpdate!.rows, userEmail) : Promise.resolve(null),
+        hayLineas ? actualizarLineas(lineasUpdate!.rows, userEmail) : Promise.resolve(null),
+      ])
+
+      const errores = [resCortes?.error, resLineas?.error].filter(Boolean)
+      if (errores.length > 0) {
+        setActualizadoMsg(`Error: ${errores.join(' / ')}`)
+        return
       }
+
+      const partes: string[] = []
+      if (resCortes) partes.push(`${resCortes.actualizados} ítems de producción`)
+      if (resLineas) partes.push(`${resLineas.actualizados} ítems de líneas`)
+      setActualizadoMsg(`✓ ${partes.join(' y ')} actualizados — refrescando...`)
+
+      // Refrescar datos en pantalla para todos
+      const items = await leerCargaActual()
+      if (items.length > 0) {
+        const recalc = items.map((it) => {
+          const diasFinal = diasRestantes(it.auditoria_final)
+          return { ...it, dias_fin_entrega: diasRestantes(it.fin_entrega), dias_auditoria_final: diasFinal, semaforo: calcularSemaforo(diasFinal) } satisfies ItemCruzado
+        })
+        setItemsDesdeNube(recalc)
+      }
+      setActualizadoMsg(`✓ ${partes.join(' y ')} actualizados`)
     } finally {
       setActualizando(false)
     }
-  }, [cortesUpdate, userEmail, setItemsDesdeNube])
+  }, [cortesUpdate, lineasUpdate, userEmail, setItemsDesdeNube])
 
   const handleDateChange = useCallback(async (itemKeys: string[], newDate: string) => {
     const newDateObj = new Date(newDate + 'T12:00:00')
@@ -456,17 +469,23 @@ export function MainPage() {
                 <span className="text-sm font-semibold text-teal-800">🔄 Actualización diaria (martes a viernes)</span>
               </div>
               <p className="text-xs text-teal-700 mb-3">
-                Solo sube el <span className="font-mono font-semibold">rptReporteSituacionOrdenesNew1.xlsm</span> para ver dónde están las prendas hoy, sin tocar Auditorías ni PGO. Requiere que la semana ya esté publicada.
+                Sube el <span className="font-mono font-semibold">rptReporteSituacionOrdenesNew1.xlsm</span> y, si lo tienes, el StatusCorte, para ver dónde están las prendas hoy, sin tocar Auditorías ni PGO. Requiere que la semana ya esté publicada.
               </p>
-              <div className="max-w-xs">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
                 <DropZone<CortesRow>
                   label="rptReporteSituacionOrdenesNew1.xlsm"
                   parse={parseCortes}
                   onParsed={setCortesUpdate}
                   result={cortesUpdate}
                 />
+                <DropZone<LineaRow>
+                  label="Status Línea (StatusCorte) — opcional"
+                  parse={parseLineas}
+                  onParsed={setLineasUpdate}
+                  result={lineasUpdate}
+                />
               </div>
-              {cortesUpdate && cortesUpdate.rows.length > 0 && (
+              {((cortesUpdate && cortesUpdate.rows.length > 0) || (lineasUpdate && lineasUpdate.rows.length > 0)) && (
                 <div className="mt-3 flex flex-wrap gap-3 items-center">
                   <button
                     onClick={handleActualizarCortes}
