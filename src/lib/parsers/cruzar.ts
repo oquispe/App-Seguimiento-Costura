@@ -17,6 +17,18 @@ function toNum(v: unknown): number {
 }
 
 /**
+ * Algunos reportes de origen exportan el mismo PO de forma inconsistente
+ * entre filas: unas veces solo el PO ("1687930") y otras con un número
+ * secundario pegado después de un espacio ("1687930 56151"), aparentemente
+ * un número de lote/release interno. Usamos el primer token como bucket de
+ * respaldo para el cruce cuando el otro reporte no trae ese sufijo — así no
+ * se pierden filas reales solo porque el formato del PO varió.
+ */
+function primerTokenPO(po: string): string {
+  return po.split(' ')[0]
+}
+
+/**
  * Agrupa filas de líneas (status.xlsm) por línea normalizada, sumando
  * cantidades — una misma OP puede tener varias partidas en la misma línea.
  */
@@ -57,10 +69,11 @@ export function buscarLineas(
   const crucePO = normalizePO(po)
   if (op) {
     const exacto = lineasPorPOOp.get(`${crucePO}|${op.trim()}`)
+      ?? lineasPorPOOp.get(`${primerTokenPO(crucePO)}|${op.trim()}`)
     if (exacto && exacto.length > 0) return exacto
   }
 
-  const todos = lineasPorPO.get(crucePO)
+  const todos = lineasPorPO.get(crucePO) ?? lineasPorPO.get(primerTokenPO(crucePO))
   if (!todos || todos.length === 0) return []
 
   const estiloNorm = normalize(estilo)
@@ -108,7 +121,7 @@ function buscarCorte(
   auditEstilo: string,
   cortesPorPO: Map<string, CortesRow[]>
 ): CortesRow | null {
-  const todos = cortesPorPO.get(crucePO)
+  const todos = cortesPorPO.get(crucePO) ?? cortesPorPO.get(primerTokenPO(crucePO))
   if (!todos || todos.length === 0) return null
 
   // Si el Status trae estilo y hay más de un estilo bajo este PO, acotar
@@ -173,6 +186,17 @@ export function indexarLineas(lineas: LineaRow[]): {
     const arrPO = lineasPorPO.get(kPO) ?? []
     arrPO.push(l)
     lineasPorPO.set(kPO, arrPO)
+
+    const prefijo = primerTokenPO(kPO)
+    if (prefijo !== kPO) {
+      const kPOOpPrefijo = `${prefijo}|${l.op.trim()}`
+      const arrOpPrefijo = lineasPorPOOp.get(kPOOpPrefijo) ?? []
+      arrOpPrefijo.push(l)
+      lineasPorPOOp.set(kPOOpPrefijo, arrOpPrefijo)
+      const arrPOPrefijo = lineasPorPO.get(prefijo) ?? []
+      arrPOPrefijo.push(l)
+      lineasPorPO.set(prefijo, arrPOPrefijo)
+    }
   }
   return { lineasPorPOOp, lineasPorPO }
 }
@@ -203,6 +227,13 @@ export function cruzarDatos(
     const arr = cortesPorPO.get(kPO) ?? []
     arr.push(c)
     cortesPorPO.set(kPO, arr)
+
+    const prefijo = primerTokenPO(kPO)
+    if (prefijo !== kPO) {
+      const arrPrefijo = cortesPorPO.get(prefijo) ?? []
+      arrPrefijo.push(c)
+      cortesPorPO.set(prefijo, arrPrefijo)
+    }
   }
 
   const items: ItemCruzado[] = []
