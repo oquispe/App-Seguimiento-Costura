@@ -8,13 +8,22 @@ function toNum(v: unknown): number {
   return isNaN(n) ? 0 : n
 }
 
+/**
+ * El reporte de origen no es consistente entre exportaciones: a veces trae
+ * "Linea_Costura" (con guión bajo) y otras "LINEA COSTURA" (con espacio).
+ * Se normaliza el guión bajo como si fuera espacio para tolerar ambas.
+ */
+function normalizeHeader(text: unknown): string {
+  return normalize(text).replace(/_/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
 // Columnas del reporte "status.xlsm" (hoja StatusCorte)
 const COL_ALIAS: Record<string, string> = {
   'PO':             'po',
   'OP':             'op',
   'ESTILO CLIENTE': 'estilo',
   'COLOR PRENDA':   'color',
-  'LINEA_COSTURA':  'linea',
+  'LINEA COSTURA':  'linea',
   'EN ESTANTERIA':  'en_estanteria',
   'EN PROCESO':     'en_proceso',
 }
@@ -48,7 +57,7 @@ export function parseLineas(buffer: ArrayBuffer): ParseResult<LineaRow> {
     const row = data[r] ?? []
     const tempIdx: Record<string, number> = {}
     for (let c = 0; c < row.length; c++) {
-      const norm = normalize(String(row[c] ?? ''))
+      const norm = normalizeHeader(row[c])
       if (COL_ALIAS[norm] && !(COL_ALIAS[norm] in tempIdx)) tempIdx[COL_ALIAS[norm]] = c
     }
     if ('po' in tempIdx) {
