@@ -205,7 +205,7 @@ export async function actualizarStatusCortes(
 
   // Misma prioridad que buscarCorte(): exacto → color sin código (fuzzy) →
   // único ítem vigente bajo ese PO+estilo (sin ambigüedad).
-  function buscarVigentes(cr: CortesRow): string[] | undefined {
+  function buscarVigentes(cr: CortesRow): Vigente[] | undefined {
     const candidatosPO = porPO.get(normalizePO(cr.po))
     if (!candidatosPO || candidatosPO.length === 0) return undefined
 
@@ -220,12 +220,12 @@ export async function actualizarStatusCortes(
     const crColorStrip = stripColorCode(cr.color)
 
     const exacto = candidatos.filter(v => normalize(v.color) === crColorNorm)
-    if (exacto.length > 0) return exacto.map(v => v.item_key)
+    if (exacto.length > 0) return exacto
 
     const fuzzy = candidatos.filter(v => stripColorCode(v.color) === crColorStrip)
-    if (fuzzy.length > 0) return fuzzy.map(v => v.item_key)
+    if (fuzzy.length > 0) return fuzzy
 
-    if (candidatos.length === 1) return [candidatos[0].item_key]
+    if (candidatos.length === 1) return candidatos
 
     return undefined
   }
@@ -234,12 +234,13 @@ export async function actualizarStatusCortes(
   const updateRows: Record<string, unknown>[] = []
 
   for (const cr of cortesRows) {
-    const itemKeys = buscarVigentes(cr)
-    if (!itemKeys) continue
+    const vigentesMatch = buscarVigentes(cr)
+    if (!vigentesMatch) continue
 
-    for (const item_key of itemKeys) {
+    for (const v of vigentesMatch) {
       updateRows.push({
-        item_key,
+        item_key:            v.item_key,
+        base_key:            makeBaseKey(v.po, v.estilo ?? '', v.color),
         op:                  cr.op,
         ruta:                cr.ruta,
         en_corte:            cr.en_corte,
@@ -312,6 +313,7 @@ export async function actualizarLineas(
     const lineasMatch = buscarLineas(v.po, v.op ?? '', v.estilo ?? '', v.color, lineasPorPOOp, lineasPorPO)
     return {
       item_key:    v.item_key,
+      base_key:    makeBaseKey(v.po, v.estilo ?? '', v.color),
       lineas:      agruparLineas(lineasMatch),
       cargado_por: cargadoPor,
       cargado_at:  ahora,
