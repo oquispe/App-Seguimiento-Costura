@@ -28,3 +28,7 @@ Thumbs.db
 
 # Vercel
 .vercel/
+
+# Carpetas ajenas a este proyecto (guardadas localmente en esta misma carpeta OneDrive)
+Proyecto_Balance/
+Ultimos/
