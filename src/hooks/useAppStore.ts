@@ -3,6 +3,7 @@ import type {
   AuditoriaRow,
   PgoRow,
   CortesRow,
+  LineaRow,
   ItemCruzado,
   DiagnosticoCruce,
   LlaveCruce,
@@ -14,6 +15,7 @@ export interface AppState {
   auditorias: AuditoriaRow[]
   pgos: PgoRow[]
   cortes: CortesRow[]
+  lineas: LineaRow[]
   items: ItemCruzado[]
   diagnostico: DiagnosticoCruce | null
   llaveCruce: LlaveCruce
@@ -21,6 +23,7 @@ export interface AppState {
     auditorias: ParseResult<AuditoriaRow> | null
     pgo: ParseResult<PgoRow> | null
     cortes: ParseResult<CortesRow> | null
+    lineas: ParseResult<LineaRow> | null
   }
 }
 
@@ -28,10 +31,11 @@ const EMPTY_STATE: AppState = {
   auditorias: [],
   pgos: [],
   cortes: [],
+  lineas: [],
   items: [],
   diagnostico: null,
   llaveCruce: 'PO',
-  parseResults: { auditorias: null, pgo: null, cortes: null },
+  parseResults: { auditorias: null, pgo: null, cortes: null, lineas: null },
 }
 
 export function useAppStore() {
@@ -41,7 +45,7 @@ export function useAppStore() {
     (result: ParseResult<AuditoriaRow>) => {
       setState((prev) => {
         const next = { ...prev, auditorias: result.rows, parseResults: { ...prev.parseResults, auditorias: result } }
-        const { items, diagnostico } = cruzarDatos(next.auditorias, next.pgos, next.cortes, next.llaveCruce)
+        const { items, diagnostico } = cruzarDatos(next.auditorias, next.pgos, next.cortes, next.llaveCruce, next.lineas)
         return { ...next, items, diagnostico }
       })
     },
@@ -52,7 +56,7 @@ export function useAppStore() {
     (result: ParseResult<PgoRow>) => {
       setState((prev) => {
         const next = { ...prev, pgos: result.rows, parseResults: { ...prev.parseResults, pgo: result } }
-        const { items, diagnostico } = cruzarDatos(next.auditorias, next.pgos, next.cortes, next.llaveCruce)
+        const { items, diagnostico } = cruzarDatos(next.auditorias, next.pgos, next.cortes, next.llaveCruce, next.lineas)
         return { ...next, items, diagnostico }
       })
     },
@@ -63,7 +67,18 @@ export function useAppStore() {
     (result: ParseResult<CortesRow>) => {
       setState((prev) => {
         const next = { ...prev, cortes: result.rows, parseResults: { ...prev.parseResults, cortes: result } }
-        const { items, diagnostico } = cruzarDatos(next.auditorias, next.pgos, next.cortes, next.llaveCruce)
+        const { items, diagnostico } = cruzarDatos(next.auditorias, next.pgos, next.cortes, next.llaveCruce, next.lineas)
+        return { ...next, items, diagnostico }
+      })
+    },
+    []
+  )
+
+  const setLineas = useCallback(
+    (result: ParseResult<LineaRow>) => {
+      setState((prev) => {
+        const next = { ...prev, lineas: result.rows, parseResults: { ...prev.parseResults, lineas: result } }
+        const { items, diagnostico } = cruzarDatos(next.auditorias, next.pgos, next.cortes, next.llaveCruce, next.lineas)
         return { ...next, items, diagnostico }
       })
     },
@@ -73,7 +88,7 @@ export function useAppStore() {
   const setLlaveCruce = useCallback(
     (llave: LlaveCruce) => {
       setState((prev) => {
-        const { items, diagnostico } = cruzarDatos(prev.auditorias, prev.pgos, prev.cortes, llave)
+        const { items, diagnostico } = cruzarDatos(prev.auditorias, prev.pgos, prev.cortes, llave, prev.lineas)
         return { ...prev, llaveCruce: llave, items, diagnostico }
       })
     },
@@ -99,5 +114,5 @@ export function useAppStore() {
     setState((prev) => ({ ...prev, items }))
   }, [])
 
-  return { state, setAuditorias, setPgos, setCortes, setLlaveCruce, mergeSegimiento, setItemsDesdeNube }
+  return { state, setAuditorias, setPgos, setCortes, setLineas, setLlaveCruce, mergeSegimiento, setItemsDesdeNube }
 }

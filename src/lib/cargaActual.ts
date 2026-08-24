@@ -58,6 +58,7 @@ export async function publicarCargaActual(
     porc_exp:            it.porc_exp,
     total_requeridas:    it.total_requeridas,
     ops:                 it.ops ?? [],
+    lineas:              it.lineas ?? [],
     vigente:     true,
     cargado_por: cargadoPor,
     cargado_at:  ahora,
@@ -144,6 +145,7 @@ export async function leerCargaActual(): Promise<ItemCruzado[]> {
       porc_exp:            Number(row.porc_exp            ?? 0),
       total_requeridas:    Number(row.total_requeridas    ?? 0),
       ops:                 (row.ops ?? []) as ItemCruzado['ops'],
+      lineas:              (row.lineas ?? []) as ItemCruzado['lineas'],
       // Semáforo se recalcula en cliente
       dias_fin_entrega:    null,
       dias_auditoria_final: null,
@@ -156,6 +158,7 @@ export async function leerCargaActual(): Promise<ItemCruzado[]> {
       solicitado_por:  (seg?.solicitado_por   ?? null) as string | null,
       responsable:     (seg?.responsable      ?? null) as string | null,
       compromisos:                ((seg?.compromisos ?? {}) as ItemCruzado['compromisos']),
+      compromisos_linea:          ((seg?.compromisos_linea ?? {}) as ItemCruzado['compromisos_linea']),
       auditoria_final_override:  (seg?.auditoria_final_override ?? null) as string | null,
     } as ItemCruzado
   })

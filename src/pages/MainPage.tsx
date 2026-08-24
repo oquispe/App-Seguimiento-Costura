@@ -18,11 +18,12 @@ import { useSeguimiento } from '../hooks/useSeguimiento'
 import { parseAuditorias } from '../lib/parsers/parseAuditorias'
 import { parsePgo } from '../lib/parsers/parsePgo'
 import { parseCortes } from '../lib/parsers/parseCortes'
+import { parseLineas } from '../lib/parsers/parseLineas'
 import { exportarExcel, exportarCompromisos } from '../lib/exporters/exportExcel'
 import { extraerCompromisos } from '../lib/compromisos'
 import { TablaCompromisos } from '../components/compromisos/TablaCompromisos'
 import { Spinner } from '../components/ui/Spinner'
-import type { ItemCruzado, AuditoriaRow, PgoRow, CortesRow, ParseResult } from '../types'
+import type { ItemCruzado, AuditoriaRow, PgoRow, CortesRow, LineaRow, ParseResult } from '../types'
 import type { Filtros } from '../components/table/Filtros'
 
 type Tab = 'dashboard' | 'carga' | 'cumplimiento' | 'compromisos'
@@ -32,7 +33,7 @@ const EMPTY_FILTROS: Filtros = {
 }
 
 export function MainPage() {
-  const { state, setAuditorias, setPgos, setCortes, setLlaveCruce, mergeSegimiento, setItemsDesdeNube } = useAppStore()
+  const { state, setAuditorias, setPgos, setCortes, setLineas, setLlaveCruce, mergeSegimiento, setItemsDesdeNube } = useAppStore()
   const { cargarSeguimiento, cargarComentarios } = useSeguimiento()
   const [tab, setTab] = useState<Tab>('dashboard')
   const [filtros, setFiltros] = useState<Filtros>(EMPTY_FILTROS)
@@ -125,6 +126,7 @@ export function MainPage() {
             solicitado_por: s.solicitado_por,
             responsable: s.responsable,
             compromisos: s.compromisos ?? {},
+            compromisos_linea: s.compromisos_linea ?? {},
             auditoria_final_override: s.auditoria_final_override,
           }
         })
@@ -384,9 +386,9 @@ export function MainPage() {
                 <span className="text-sm font-semibold text-blue-800">📅 Publicación semanal (cada lunes)</span>
               </div>
               <p className="text-xs text-blue-700 mb-3">
-                Sube los 3 archivos para iniciar el seguimiento de la semana. Esto reemplaza la carga anterior y la comparte con todos los usuarios.
+                Sube los 4 archivos para iniciar el seguimiento de la semana. Esto reemplaza la carga anterior y la comparte con todos los usuarios.
               </p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <DropZone<AuditoriaRow>
                   label="Auditorías (hojas por semana)"
                   parse={parseAuditorias}
@@ -404,6 +406,12 @@ export function MainPage() {
                   parse={parseCortes}
                   onParsed={(r) => setCortes(r)}
                   result={state.parseResults.cortes}
+                />
+                <DropZone<LineaRow>
+                  label="Status Línea (StatusCorte)"
+                  parse={parseLineas}
+                  onParsed={(r) => setLineas(r)}
+                  result={state.parseResults.lineas}
                 />
               </div>
             </div>

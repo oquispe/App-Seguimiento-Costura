@@ -46,6 +46,25 @@ export interface CortesRow {
   ops: OpDetalle[]
 }
 
+/** Cantidad de prendas (Estantería + Proceso) que tiene una línea de costura. */
+export interface LineaDetalle {
+  linea: string
+  en_estanteria: number
+  en_proceso: number
+  cantidad: number
+}
+
+/** Fila cruda del reporte StatusCorte (status.xlsm), a nivel PO+OP+Línea. */
+export interface LineaRow {
+  po: string
+  op: string
+  estilo: string
+  color: string
+  linea: string
+  en_estanteria: number
+  en_proceso: number
+}
+
 /** Avance de una OP individual dentro de un PO+Estilo+Color. */
 export interface OpDetalle {
   op: string
@@ -103,6 +122,8 @@ export interface ItemCruzado {
   produccion_cerrada: boolean
   // Desglose por OP individual (ver CortesRow.ops)
   ops: OpDetalle[]
+  // Desglose por línea de costura (ver CortesRow.lineas)
+  lineas: LineaDetalle[]
   // Semáforo
   dias_fin_entrega: number | null
   dias_auditoria_final: number | null
@@ -115,6 +136,7 @@ export interface ItemCruzado {
   solicitado_por: string | null
   responsable: string | null
   compromisos: CompromisosEtapas
+  compromisos_linea: CompromisosLinea
   auditoria_final_override: string | null
 }
 
@@ -137,6 +159,14 @@ export interface CompromisoEtapa {
 
 export type CompromisosEtapas = Record<string, CompromisoEtapa>
 
+// ─── Compromisos por línea de costura ─────────────────────────────────────────
+
+export interface CompromisoLinea {
+  fecha_jefe_sector: string | null // YYYY-MM-DD: compromiso de ingreso del Jefe de Sector
+}
+
+export type CompromisosLinea = Record<string, CompromisoLinea>
+
 // ─── Seguimiento (tabla Supabase) ──────────────────────────────────────────────
 
 export interface SeguimientoRecord {
@@ -156,6 +186,7 @@ export interface SeguimientoRecord {
   solicitado_por: string | null
   responsable: string | null
   compromisos: CompromisosEtapas | null
+  compromisos_linea: CompromisosLinea | null
   auditoria_final_override: string | null
 }
 

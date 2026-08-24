@@ -6,9 +6,9 @@ import { Badge } from '../ui/Badge'
 import { Spinner } from '../ui/Spinner'
 import { SemaforoDot } from '../ui/Semaforo'
 import { useSeguimiento } from '../../hooks/useSeguimiento'
-import { ubicacionActual, ubicacionActualOp, opListo, estaListoParaAuditar, totalOrden } from '../../lib/posicion'
+import { ubicacionActual, ubicacionActualOp, ubicacionLineas, opListo, estaListoParaAuditar, totalOrden } from '../../lib/posicion'
 import { getErrorMessage } from '../../lib/errorUtils'
-import type { ItemCruzado, OpDetalle, CompromisoEtapa, CompromisosEtapas } from '../../types'
+import type { ItemCruzado, OpDetalle, CompromisoEtapa, CompromisosEtapas, CompromisoLinea, CompromisosLinea } from '../../types'
 
 interface Props {
   item: ItemCruzado | null
@@ -208,16 +208,104 @@ function CompromisosSection({
   )
 }
 
+// ─── Compromisos por línea de costura ─────────────────────────────────────────
+
+const COMPROMISO_LINEA_VACIO: CompromisoLinea = { fecha_jefe_sector: null }
+
+function CompromisosLineaSection({
+  item,
+  compromisosLinea,
+  onChange,
+}: {
+  item: ItemCruzado
+  compromisosLinea: CompromisosLinea
+  onChange: (c: CompromisosLinea) => void
+}) {
+  const lineas = ubicacionLineas(item)
+  const hoy = new Date()
+  hoy.setHours(0, 0, 0, 0)
+
+  if (lineas.length === 0) {
+    return <p className="text-sm text-ink-muted">No hay líneas con prendas pendientes.</p>
+  }
+
+  const setFecha = (key: string, value: string | null) => {
+    onChange({
+      ...compromisosLinea,
+      [key]: { ...(compromisosLinea[key] ?? COMPROMISO_LINEA_VACIO), fecha_jefe_sector: value },
+    })
+  }
+
+  const quitar = (key: string) => {
+    const { [key]: _omit, ...resto } = compromisosLinea
+    onChange(resto)
+  }
+
+  return (
+    <div className="space-y-3">
+      {lineas.map((l) => {
+        const comp = compromisosLinea[l.key] ?? COMPROMISO_LINEA_VACIO
+        const fecha = comp.fecha_jefe_sector
+          ? new Date(comp.fecha_jefe_sector + 'T12:00:00')
+          : null
+        const vencido = fecha && fecha < hoy
+
+        return (
+          <div key={l.key} className="border border-line rounded-lg p-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-ink">{l.label}</span>
+                <Badge variant="ambar">{l.cantidad}</Badge>
+              </div>
+              <div className="flex items-center gap-2">
+                {vencido && (
+                  <div className="flex items-center gap-1 text-red-600">
+                    <AlertTriangle className="w-4 h-4" />
+                    <span className="text-xs font-medium">Vencida</span>
+                  </div>
+                )}
+                {compromisosLinea[l.key] && (
+                  <button
+                    type="button"
+                    onClick={() => quitar(l.key)}
+                    title="Quitar esta fecha"
+                    className="p-1 rounded hover:bg-red-50 text-ink-muted hover:text-red-600 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-ink-muted block mb-0.5">Fecha Jefe de Sector</label>
+              <input
+                type="date"
+                value={comp.fecha_jefe_sector ?? ''}
+                onChange={(ev) => setFecha(l.key, ev.target.value || null)}
+                className={`w-full border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 ${
+                  vencido ? 'border-red-400 bg-red-50' : 'border-line'
+                }`}
+              />
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ─── Drawer principal ─────────────────────────────────────────────────────────
 
 export function DrawerDetalle({ item, onClose, onUpdated }: Props) {
   const { guardarSeguimiento } = useSeguimiento()
   const [compromisos, setCompromisos] = useState<CompromisosEtapas>({})
+  const [compromisosLinea, setCompromisosLinea] = useState<CompromisosLinea>({})
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (!item) return
     setCompromisos(item.compromisos ?? {})
+    setCompromisosLinea(item.compromisos_linea ?? {})
   }, [item])
 
   const [guardadoOk, setGuardadoOk] = useState(false)
@@ -229,7 +317,7 @@ export function DrawerDetalle({ item, onClose, onUpdated }: Props) {
     setGuardadoOk(false)
     setGuardadoError(null)
     try {
-      const updated: ItemCruzado = { ...item, compromisos }
+      const updated: ItemCruzado = { ...item, compromisos, compromisos_linea: compromisosLinea }
       await guardarSeguimiento(updated)
       onUpdated(updated)
       setGuardadoOk(true)
@@ -239,7 +327,7 @@ export function DrawerDetalle({ item, onClose, onUpdated }: Props) {
     } finally {
       setSaving(false)
     }
-  }, [item, compromisos, guardarSeguimiento, onUpdated])
+  }, [item, compromisos, compromisosLinea, guardarSeguimiento, onUpdated])
 
   if (!item) return null
 
@@ -336,6 +424,18 @@ export function DrawerDetalle({ item, onClose, onUpdated }: Props) {
               item={item}
               compromisos={compromisos}
               onChange={setCompromisos}
+            />
+          </section>
+
+          {/* Compromisos por línea de costura */}
+          <section className="p-4 border-t border-line">
+            <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">
+              Fecha Jefe de Sector (por línea)
+            </h3>
+            <CompromisosLineaSection
+              item={item}
+              compromisosLinea={compromisosLinea}
+              onChange={setCompromisosLinea}
             />
             <button
               onClick={handleGuardar}

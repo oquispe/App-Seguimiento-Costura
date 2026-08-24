@@ -31,6 +31,7 @@ export function useSeguimiento() {
       solicitado_por:  item.solicitado_por,
       responsable:     item.responsable,
       compromisos:     item.compromisos ?? null,
+      compromisos_linea: item.compromisos_linea ?? null,
       auditoria_final_override: item.auditoria_final_override ?? null,
     }
     const { error } = await supabase

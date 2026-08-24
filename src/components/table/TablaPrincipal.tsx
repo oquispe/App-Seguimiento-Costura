@@ -5,7 +5,7 @@ import { es } from 'date-fns/locale'
 import { ChevronRight, AlertCircle, ChevronDown, CalendarPlus, CalendarDays, GripVertical, MessageSquareText, RotateCcw } from 'lucide-react'
 import type { Semaforo } from '../../lib/parsers/dateUtils'
 import { Badge } from '../ui/Badge'
-import { ubicacionActual, estaListoParaAuditar, estadoEfectivo, totalOrden, type EstadoEfectivo } from '../../lib/posicion'
+import { ubicacionActual, ubicacionLineas, estaListoParaAuditar, estadoEfectivo, totalOrden, type EstadoEfectivo } from '../../lib/posicion'
 import type { ItemCruzado, CompromisosEtapas, CompromisoEtapa } from '../../types'
 
 interface Props {
@@ -138,6 +138,44 @@ function PosicionChips({ item }: { item: ItemCruzado }) {
       {bitacoraAnchor && (
         <BitacoraPopover entries={compromisoEntries} anchorRect={bitacoraAnchor} onClose={cerrarBitacora} />
       )}
+    </div>
+  )
+}
+
+// ─── Chips de línea de costura: nombre + cantidad (Estantería+Proceso) ────────
+
+function LineaChips({ item }: { item: ItemCruzado }) {
+  const lineas = ubicacionLineas(item)
+  if (lineas.length === 0) {
+    return <span className="text-[11px] text-slate-400 italic">—</span>
+  }
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
+  return (
+    <div className="flex flex-wrap gap-1.5 items-center min-w-0">
+      {lineas.map((l) => {
+        const fecha = item.compromisos_linea?.[l.key]?.fecha_jefe_sector ?? null
+        const vencido = fecha ? new Date(fecha + 'T12:00:00') < hoy : false
+        const fechaFmt = fecha ? format(new Date(fecha + 'T12:00:00'), 'dd/MM', { locale: es }) : null
+        return (
+          <span
+            key={l.key}
+            title={l.label}
+            className={`inline-flex items-center gap-1 rounded-lg border pl-2 pr-1.5 py-1 text-[11px] font-medium whitespace-nowrap ${
+              vencido ? 'bg-red-50 border-red-200 text-red-700' : 'bg-slate-50 border-slate-200 text-slate-700'
+            }`}
+          >
+            <span className="max-w-[110px] truncate">{l.label}</span>
+            <span className={`rounded-full px-1.5 py-px text-[10px] font-bold ${vencido ? 'bg-red-600/10' : 'bg-slate-600/10'}`}>
+              {l.cantidad}
+            </span>
+            {fechaFmt && (
+              <span className={`pl-1 ml-0.5 border-l text-[10px] ${vencido ? 'border-red-300' : 'border-slate-300'}`}>
+                {fechaFmt}
+              </span>
+            )}
+          </span>
+        )
+      })}
     </div>
   )
 }
@@ -600,6 +638,9 @@ function RowItem({ item, onClick, isDragTarget, onFillHandleMouseDown, onDateCha
       <td className="px-4 py-2.5 max-w-xs">
         <PosicionChips item={item} />
       </td>
+      <td className="px-4 py-2.5 max-w-xs">
+        <LineaChips item={item} />
+      </td>
       <td className="px-4 py-2.5 text-sm text-ink-muted whitespace-nowrap">{fmtDate(item.fin_entrega)}</td>
       <DateCell
         item={item}
@@ -638,7 +679,7 @@ function agruparPorClave<T>(items: T[], clave: (it: T) => string): Map<string, {
 function SemanaHeader({ label, count, open, onToggle }: { label: string; count: number; open: boolean; onToggle: () => void }) {
   return (
     <tr className="bg-brand-600 cursor-pointer select-none hover:bg-brand-700 transition-colors" onClick={onToggle}>
-      <td colSpan={13} className="px-4 py-2">
+      <td colSpan={14} className="px-4 py-2">
         <div className="flex items-center gap-2">
           {open
             ? <ChevronDown className="w-4 h-4 text-white/80 shrink-0" />
@@ -654,7 +695,7 @@ function SemanaHeader({ label, count, open, onToggle }: { label: string; count: 
 function ClienteHeader({ label, count, open, onToggle }: { label: string; count: number; open: boolean; onToggle: () => void }) {
   return (
     <tr className="bg-blue-50 border-y border-blue-100 cursor-pointer select-none hover:bg-blue-100 transition-colors" onClick={onToggle}>
-      <td colSpan={13} className="px-4 py-1.5 pl-10">
+      <td colSpan={14} className="px-4 py-1.5 pl-10">
         <div className="flex items-center gap-2">
           {open
             ? <ChevronDown className="w-3.5 h-3.5 text-brand-500 shrink-0" />
@@ -879,6 +920,7 @@ export function TablaPrincipal({ items, onSelectItem, agruparPor, onDateChange, 
                 <th className="text-center px-4 py-2.5">Prog.</th>
                 <th className="text-center px-4 py-2.5">Ext.</th>
                 <th className="text-left px-4 py-2.5">Posición Producción</th>
+                <th className="text-left px-4 py-2.5">Línea</th>
                 <th className="text-left px-4 py-2.5">FEC_EXFACT</th>
                 <th className="text-left px-4 py-2.5">Audit. Final</th>
                 <th className="text-left px-4 py-2.5">Estado</th>
@@ -889,7 +931,7 @@ export function TablaPrincipal({ items, onSelectItem, agruparPor, onDateChange, 
             <tbody>
               {items.length === 0 ? (
                 <tr>
-                  <td colSpan={13} className="px-4 py-12 text-center text-ink-muted">
+                  <td colSpan={14} className="px-4 py-12 text-center text-ink-muted">
                     Sin datos. Carga los archivos Excel para comenzar.
                   </td>
                 </tr>

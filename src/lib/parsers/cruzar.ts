@@ -7,7 +7,83 @@ import type {
   ItemCruzado,
   DiagnosticoCruce,
   LlaveCruce,
+  LineaRow,
+  LineaDetalle,
 } from '../../types'
+
+function toNum(v: unknown): number {
+  const n = Number(v)
+  return isNaN(n) ? 0 : n
+}
+
+/**
+ * Agrupa filas de líneas (status.xlsm) por línea normalizada, sumando
+ * cantidades — una misma OP puede tener varias partidas en la misma línea.
+ */
+function agruparLineas(rows: LineaRow[]): LineaDetalle[] {
+  const acum = new Map<string, LineaDetalle>()
+  for (const r of rows) {
+    const key = normalize(r.linea)
+    const existing = acum.get(key)
+    if (existing) {
+      existing.en_estanteria += toNum(r.en_estanteria)
+      existing.en_proceso += toNum(r.en_proceso)
+      existing.cantidad += toNum(r.en_estanteria) + toNum(r.en_proceso)
+    } else {
+      acum.set(key, {
+        linea: r.linea,
+        en_estanteria: toNum(r.en_estanteria),
+        en_proceso: toNum(r.en_proceso),
+        cantidad: toNum(r.en_estanteria) + toNum(r.en_proceso),
+      })
+    }
+  }
+  return Array.from(acum.values())
+}
+
+/**
+ * Busca las líneas de costura de un ítem: primero por PO+OP exacto (preciso,
+ * ambos reportes traen OP), y si no hay match cae a PO+Estilo+Color fuzzy
+ * (mismo criterio que buscarCorte) para tolerar OPs vacías o desalineadas.
+ */
+function buscarLineas(
+  po: string,
+  op: string,
+  estilo: string,
+  color: string,
+  lineasPorPOOp: Map<string, LineaRow[]>,
+  lineasPorPO: Map<string, LineaRow[]>
+): LineaRow[] {
+  const crucePO = normalizePO(po)
+  if (op) {
+    const exacto = lineasPorPOOp.get(`${crucePO}|${op.trim()}`)
+    if (exacto && exacto.length > 0) return exacto
+  }
+
+  const todos = lineasPorPO.get(crucePO)
+  if (!todos || todos.length === 0) return []
+
+  const estiloNorm = normalize(estilo)
+  const hayVariosEstilos = new Set(todos.map(l => normalize(l.estilo))).size > 1
+  const porEstilo = hayVariosEstilos && estiloNorm
+    ? todos.filter(l => normalize(l.estilo) === estiloNorm)
+    : []
+  const candidatos = porEstilo.length > 0 ? porEstilo : todos
+
+  const colorNorm  = normalize(color)
+  const colorStrip = stripColorCode(color)
+
+  const exacto = candidatos.filter(l => normalize(l.color) === colorNorm)
+  if (exacto.length > 0) return exacto
+
+  const fuzzy = candidatos.filter(l => stripColorCode(l.color) === colorStrip)
+  if (fuzzy.length > 0) return fuzzy
+
+  const soloUnColor = new Set(candidatos.map(l => normalize(l.color))).size === 1
+  if (soloUnColor) return candidatos
+
+  return []
+}
 
 /**
  * Busca la mejor fila de Cortes para un PO+Estilo+Color de Auditorías.
@@ -85,8 +161,23 @@ export function cruzarDatos(
   auditorias: AuditoriaRow[],
   pgos: PgoRow[],
   cortes: CortesRow[],
-  llave: LlaveCruce = 'PO'
+  llave: LlaveCruce = 'PO',
+  lineas: LineaRow[] = []
 ): { items: ItemCruzado[]; diagnostico: DiagnosticoCruce } {
+  // Índice de líneas (status.xlsm): PO+OP exacto, y PO (para fallback fuzzy)
+  const lineasPorPOOp = new Map<string, LineaRow[]>()
+  const lineasPorPO = new Map<string, LineaRow[]>()
+  for (const l of lineas) {
+    const kPO = normalizePO(l.po)
+    const kPOOp = `${kPO}|${l.op.trim()}`
+    const arrOp = lineasPorPOOp.get(kPOOp) ?? []
+    arrOp.push(l)
+    lineasPorPOOp.set(kPOOp, arrOp)
+    const arrPO = lineasPorPO.get(kPO) ?? []
+    arrPO.push(l)
+    lineasPorPO.set(kPO, arrPO)
+  }
+
   // Índice PGO
   const pgoIdx = new Map<string, PgoRow>()
   for (const p of pgos) {
@@ -136,6 +227,11 @@ export function cruzarDatos(
     const totalRequeridas = corte?.total_requeridas ?? (aud.cant_prog ?? 0)
     const aptFallback     = 0
 
+    const lineasMatch = buscarLineas(
+      crucePO, corte?.op ?? '', aud.estilo, aud.color, lineasPorPOOp, lineasPorPO
+    )
+    const lineasDetalle = agruparLineas(lineasMatch)
+
     const diasFinal  = diasRestantes(pgo?.auditoria_final ?? null)
     const item_key   = makeItemKey(aud.po, aud.estilo, aud.color, aud.semana)
     const base_key   = makeBaseKey(aud.po, aud.estilo, aud.color)
@@ -172,6 +268,7 @@ export function cruzarDatos(
       total_requeridas:    totalRequeridas,
       produccion_cerrada:  produccionCerrada,
       ops:                 corte?.ops ?? [],
+      lineas:              lineasDetalle,
       // Semáforo
       dias_fin_entrega:     diasRestantes(pgo?.fin_entrega ?? null),
       dias_auditoria_final: diasFinal,
@@ -184,6 +281,7 @@ export function cruzarDatos(
       solicitado_por:   null,
       responsable:      null,
       compromisos:                {},
+      compromisos_linea:          {},
       auditoria_final_override:  null,
     })
   }

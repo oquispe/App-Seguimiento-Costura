@@ -1,4 +1,5 @@
 import type { ItemCruzado, OpDetalle } from '../types'
+import { normalize } from './parsers/normalize'
 
 // Pipeline de áreas en orden de producción
 const PIPELINE = [
@@ -64,6 +65,18 @@ export function ubicacionActual(item: ItemCruzado): UbicacionEtapa[] {
 /** Igual que ubicacionActual pero para una OP individual dentro del ítem. */
 export function ubicacionActualOp(op: OpDetalle): UbicacionEtapa[] {
   return ubicacionDeCampos(op)
+}
+
+/**
+ * Líneas de costura donde el ítem tiene prendas ahora mismo (Estantería +
+ * Proceso). Se usa para: (1) mostrar la columna "Línea (cantidad)" y (2)
+ * decidir cuándo mostrar/ocultar el campo "Fecha Jefe de Sector" — al llegar
+ * a 0 la línea desaparece de esta lista y el campo se oculta solo.
+ */
+export function ubicacionLineas(item: ItemCruzado): UbicacionEtapa[] {
+  return (item.lineas ?? [])
+    .filter((l) => l.cantidad > 0)
+    .map((l) => ({ key: normalize(l.linea), label: l.linea, cantidad: l.cantidad, ok: false }))
 }
 
 /** true cuando una OP individual ya tiene todas sus prendas en APT. */

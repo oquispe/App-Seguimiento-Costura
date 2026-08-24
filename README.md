@@ -107,13 +107,14 @@ En *Vercel → Settings → Domains*, agrega tu dominio.
 
 ### Carga de archivos
 
-Ve a la pestaña **Cargar Excel** y arrastra (o selecciona) los 3 archivos:
+Ve a la pestaña **Cargar Excel** y arrastra (o selecciona) los 4 archivos:
 
 | Zona | Archivo esperado | Hoja |
 |------|-----------------|------|
 | Auditorías | `Auditorias Semana XX.xlsx` | Una hoja por semana |
 | PGO | `PGO_XX.xlsm` | Hoja "PGO" |
-| Status Cortes | `RptStatusGeneral...xlsx` | Hoja "StatusCorte" |
+| Situación Órdenes | `rptReporteSituacionOrdenesNew1.xlsm` | Hoja1 (posición por área) |
+| Status Línea | `status.xlsm` | Hoja "StatusCorte" (línea de costura + cantidades) |
 
 Si una columna no se reconoce, aparece un aviso en amarillo indicando qué falta.
 
