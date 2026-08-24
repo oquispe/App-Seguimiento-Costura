@@ -24,8 +24,62 @@ function toNum(v: unknown): number {
  * respaldo para el cruce cuando el otro reporte no trae ese sufijo — así no
  * se pierden filas reales solo porque el formato del PO varió.
  */
-function primerTokenPO(po: string): string {
+export function primerTokenPO(po: string): string {
   return po.split(' ')[0]
+}
+
+/**
+ * Filtra candidatos de un mismo PO por estilo (si hay ambigüedad) y color,
+ * con la misma prioridad sin importar la dirección del cruce (Auditorías→
+ * Cortes en buscarCorte, o Cortes→ítems publicados en la actualización
+ * diaria): exacto → sin código → único candidato → truncado → prefijo
+ * "ABREVIADO - NOMBRE COMPLETO". Devuelve todos los candidatos que
+ * matchean en el primer tier con resultado (puede haber más de uno si el
+ * mismo color se repite en varias OPs).
+ */
+export function filtrarPorEstiloColor<T extends { estilo?: string | null; color: string }>(
+  candidatosPO: T[],
+  targetEstilo: string,
+  targetColor: string
+): T[] {
+  const targetEstiloNorm = normalize(targetEstilo)
+  const hayVariosEstilos = new Set(candidatosPO.map(c => normalize(c.estilo ?? ''))).size > 1
+  const porEstilo = hayVariosEstilos && targetEstiloNorm
+    ? candidatosPO.filter(c => normalize(c.estilo ?? '') === targetEstiloNorm)
+    : []
+  const candidatos = porEstilo.length > 0 ? porEstilo : candidatosPO
+
+  const targetColorNorm  = normalize(targetColor)
+  const targetColorStrip = stripColorCode(targetColor)
+
+  const exacto = candidatos.filter(c => normalize(c.color) === targetColorNorm)
+  if (exacto.length > 0) return exacto
+
+  const fuzzy = candidatos.filter(c => stripColorCode(c.color) === targetColorStrip)
+  if (fuzzy.length > 0) return fuzzy
+
+  if (candidatos.length === 1) return candidatos
+
+  // Bidireccional: cualquiera de los dos lados (candidato o target) puede
+  // ser el que llegó truncado, según el reporte de origen de cada uno.
+  const truncado = candidatos.filter(c => {
+    const cNorm = normalize(c.color)
+    return (cNorm.length >= 5 && (
+      targetColorStrip.startsWith(cNorm) || targetColorNorm.startsWith(cNorm)
+    )) || (targetColorNorm.length >= 5 && (
+      cNorm.startsWith(targetColorStrip) || cNorm.startsWith(targetColorNorm)
+    ))
+  })
+  if (truncado.length > 0) return truncado
+
+  const partes = targetColorNorm.split(/\s*[-–]\s*/)
+  for (let len = 1; len < partes.length; len++) {
+    const prefijo = partes.slice(0, len).join(' - ')
+    const encontrado = candidatos.filter(c => normalize(c.color) === prefijo)
+    if (encontrado.length > 0) return encontrado
+  }
+
+  return []
 }
 
 /**
@@ -124,50 +178,8 @@ function buscarCorte(
   const todos = cortesPorPO.get(crucePO) ?? cortesPorPO.get(primerTokenPO(crucePO))
   if (!todos || todos.length === 0) return null
 
-  // Si el Status trae estilo y hay más de un estilo bajo este PO, acotar
-  // los candidatos al estilo correcto antes de buscar por color.
-  const auditEstiloNorm = normalize(auditEstilo)
-  const hayVariosEstilos = new Set(todos.map(c => normalize(c.estilo))).size > 1
-  const porEstilo = hayVariosEstilos && auditEstiloNorm
-    ? todos.filter(c => normalize(c.estilo) === auditEstiloNorm)
-    : []
-  const candidatos = porEstilo.length > 0 ? porEstilo : todos
-
-  const auditColorNorm   = normalize(auditColor)
-  const auditColorStrip  = stripColorCode(auditColor)
-
-  // 1. Exacto
-  const exacto = candidatos.find(c => normalize(c.color) === auditColorNorm)
-  if (exacto) return exacto
-
-  // 2. Sin código de color (numérico o alfa-corto)
-  const fuzzy = candidatos.find(c => stripColorCode(c.color) === auditColorStrip)
-  if (fuzzy) return fuzzy
-
-  // 3. Único color → no hay riesgo de cruzar datos entre colores distintos
-  if (candidatos.length === 1) return candidatos[0]
-
-  // 4. Truncación: Status truncó el nombre del color
-  //    Ej: aud="WINDY BLUE / DARK OLIVE", sts="WINDY BLUE / DARK OL"
-  const truncado = candidatos.find(c => {
-    const cNorm = normalize(c.color)
-    return cNorm.length >= 5 && (
-      auditColorStrip.startsWith(cNorm) || auditColorNorm.startsWith(cNorm)
-    )
-  })
-  if (truncado) return truncado
-
-  // 5. Formato "ABREVIADO - NOMBRE COMPLETO" donde la abreviatura tiene espacios
-  //    Ej: aud="LAVENDER AURA/WINDWA - LAVENDER AURA/WINDWARD", sts="LAVENDER AURA/WINDWA"
-  //    Ej: aud="THE BUCK - PONDEROSA - THE BUCK - PONDEROSA GREEN/WHITE", sts="THE BUCK - PONDEROSA"
-  const partes = auditColorNorm.split(/\s*[-–]\s*/)
-  for (let len = 1; len < partes.length; len++) {
-    const prefijo = partes.slice(0, len).join(' - ')
-    const encontrado = candidatos.find(c => normalize(c.color) === prefijo)
-    if (encontrado) return encontrado
-  }
-
-  return null
+  const match = filtrarPorEstiloColor(todos, auditEstilo, auditColor)
+  return match[0] ?? null
 }
 
 /** Índice de líneas (status.xlsm): PO+OP exacto, y PO (para fallback fuzzy). */

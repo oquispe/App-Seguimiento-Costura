@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
-import { normalize, normalizePO, makeBaseKey, stripColorCode } from './parsers/normalize'
-import { agruparLineas, buscarLineas, indexarLineas } from './parsers/cruzar'
+import { normalizePO, makeBaseKey } from './parsers/normalize'
+import { agruparLineas, buscarLineas, indexarLineas, filtrarPorEstiloColor, primerTokenPO } from './parsers/cruzar'
 import type { ItemCruzado, CortesRow, LineaRow } from '../types'
 
 /**
@@ -201,33 +201,28 @@ export async function actualizarStatusCortes(
     const arr = porPO.get(kPO) ?? []
     arr.push(v)
     porPO.set(kPO, arr)
+
+    // Igual que en cruzarDatos(): algunos reportes traen el mismo PO con un
+    // número secundario pegado ("1687930 56151") de forma inconsistente
+    // entre filas — se indexa también por el primer token como respaldo.
+    const prefijo = primerTokenPO(kPO)
+    if (prefijo !== kPO) {
+      const arrPrefijo = porPO.get(prefijo) ?? []
+      arrPrefijo.push(v)
+      porPO.set(prefijo, arrPrefijo)
+    }
   }
 
-  // Misma prioridad que buscarCorte(): exacto → color sin código (fuzzy) →
-  // único ítem vigente bajo ese PO+estilo (sin ambigüedad).
+  // Misma lógica y prioridad que buscarCorte() en cruzar.ts (exacto → sin
+  // código → único → truncado → abreviado), para que la actualización diaria
+  // encuentre exactamente los mismos matches que la publicación semanal.
   function buscarVigentes(cr: CortesRow): Vigente[] | undefined {
-    const candidatosPO = porPO.get(normalizePO(cr.po))
+    const crucePO = normalizePO(cr.po)
+    const candidatosPO = porPO.get(crucePO) ?? porPO.get(primerTokenPO(crucePO))
     if (!candidatosPO || candidatosPO.length === 0) return undefined
 
-    const crEstiloNorm = normalize(cr.estilo)
-    const hayVariosEstilos = new Set(candidatosPO.map(v => normalize(v.estilo ?? ''))).size > 1
-    const porEstilo = hayVariosEstilos && crEstiloNorm
-      ? candidatosPO.filter(v => normalize(v.estilo ?? '') === crEstiloNorm)
-      : []
-    const candidatos = porEstilo.length > 0 ? porEstilo : candidatosPO
-
-    const crColorNorm  = normalize(cr.color)
-    const crColorStrip = stripColorCode(cr.color)
-
-    const exacto = candidatos.filter(v => normalize(v.color) === crColorNorm)
-    if (exacto.length > 0) return exacto
-
-    const fuzzy = candidatos.filter(v => stripColorCode(v.color) === crColorStrip)
-    if (fuzzy.length > 0) return fuzzy
-
-    if (candidatos.length === 1) return candidatos
-
-    return undefined
+    const match = filtrarPorEstiloColor(candidatosPO, cr.estilo, cr.color)
+    return match.length > 0 ? match : undefined
   }
 
   const ahora = new Date().toISOString()
